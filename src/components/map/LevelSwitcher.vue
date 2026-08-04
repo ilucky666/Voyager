@@ -9,6 +9,7 @@ const emit = defineEmits<{
 }>()
 
 const levels: Array<{ value: AdminLevel; label: string }> = [
+  { value: 'country', label: '国' },
   { value: 'province', label: '省' },
   { value: 'city', label: '市' },
   { value: 'county', label: '县' },

@@ -1,17 +1,15 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import MapView from './components/views/MapView.vue'
-import FootprintView from './components/views/FootprintView.vue'
-import PlanView from './components/views/PlanView.vue'
-import SettingsView from './components/views/SettingsView.vue'
+import { ref, onMounted, computed } from 'vue'
 import { useTravelStore } from './stores/travel'
 import { checkURLImport, importFromJSON, clearURLImport } from './composables/useSync'
+import { Map, Footprints, Plane, Settings } from 'lucide-vue-next'
+import { useRoute, useRouter } from 'vue-router'
+import MapView from './components/views/MapView.vue'
 
-type PanelType = 'none' | 'footprint' | 'plan' | 'settings'
-
-const activePanel = ref<PanelType>('none')
 const travelStore = useTravelStore()
 const syncMessage = ref('')
+const route = useRoute()
+const router = useRouter()
 
 onMounted(async () => {
   await travelStore.loadPlaces()
@@ -31,47 +29,52 @@ onMounted(async () => {
   }
 })
 
-function togglePanel(panel: PanelType) {
-  activePanel.value = activePanel.value === panel ? 'none' : panel
-}
-
-const tabs: Array<{ key: PanelType; label: string; icon: string }> = [
-  { key: 'none', label: '地图', icon: '🗺️' },
-  { key: 'footprint', label: '足迹', icon: '📍' },
-  { key: 'plan', label: '规划', icon: '✈️' },
-  { key: 'settings', label: '设置', icon: '⚙️' },
+const tabs = [
+  { key: 'map', path: '/', label: '地图', icon: Map },
+  { key: 'footprint', path: '/footprint', label: '足迹', icon: Footprints },
+  { key: 'plan', path: '/plan', label: '规划', icon: Plane },
+  { key: 'settings', path: '/settings', label: '设置', icon: Settings },
 ]
+
+const showTabBar = computed(() => route.meta.showTabBar !== false)
 </script>
 
 <template>
-  <div class="app-container">
-    <MapView class="map-layer" />
-
-    <Transition name="fade">
-      <div v-if="syncMessage" class="sync-toast">{{ syncMessage }}</div>
-    </Transition>
-
-    <Transition name="slide">
-      <div v-if="activePanel !== 'none'" class="panel-overlay">
-        <div class="panel-backdrop" @click="activePanel = 'none'"></div>
-        <div class="panel-content">
-          <FootprintView v-if="activePanel === 'footprint'" />
-          <PlanView v-else-if="activePanel === 'plan'" />
-          <SettingsView v-else-if="activePanel === 'settings'" />
-        </div>
+  <div class="app-container font-sans text-gray-900 dark:text-gray-100 bg-gray-100 dark:bg-black w-full h-full relative overflow-hidden">
+    
+    <!-- Toast for Sync -->
+    <Transition name="toast">
+      <div v-if="syncMessage" class="absolute top-[env(safe-area-inset-top,16px)] left-1/2 -translate-x-1/2 px-4 py-2 bg-green-500 text-white rounded-xl shadow-lg z-50 text-sm whitespace-nowrap">
+        {{ syncMessage }}
       </div>
     </Transition>
 
-    <nav class="tab-bar">
+    <div class="map-layer absolute inset-0 z-0">
+      <MapView />
+    </div>
+
+    <!-- Overlay panels via Router -->
+    <div class="overlay-container absolute inset-0 z-10 pointer-events-none pb-[calc(16px+env(safe-area-inset-bottom,0px)+64px)]">
+      <router-view v-slot="{ Component }">
+        <transition name="slide-fade" mode="out-in">
+          <div v-if="Component && route.name !== 'map'" class="pointer-events-auto w-full h-full md:w-[420px] bg-white/80 dark:bg-[#1c1c1e]/80 backdrop-blur-2xl border-r border-white/20 dark:border-white/10 shadow-2xl overflow-hidden flex flex-col absolute right-0 md:left-0 md:right-auto md:h-full rounded-t-3xl md:rounded-none mt-[env(safe-area-inset-top,0px)]">
+            <component :is="Component" />
+          </div>
+        </transition>
+      </router-view>
+    </div>
+
+    <!-- Glassmorphism Tab Bar -->
+    <nav v-if="showTabBar" class="tab-bar absolute bottom-[calc(16px+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 flex justify-around items-center h-16 w-[calc(100%-32px)] max-w-[400px] z-40 bg-white/70 dark:bg-[#1c1c1e]/70 backdrop-blur-xl border border-white/20 dark:border-white/10 rounded-full shadow-[0_8px_32px_rgba(0,0,0,0.12)]">
       <button
         v-for="tab in tabs"
         :key="tab.key"
-        class="tab-item"
-        :class="{ active: (tab.key === 'none' && activePanel === 'none') || activePanel === tab.key }"
-        @click="tab.key === 'none' ? (activePanel = 'none') : togglePanel(tab.key)"
+        @click="router.push(tab.path)"
+        class="tab-item flex flex-col items-center justify-center gap-1 w-16 h-full transition-all duration-300 ease-out"
+        :class="{ 'active': route.path === tab.path }"
       >
-        <span class="tab-icon">{{ tab.icon }}</span>
-        <span class="tab-label">{{ tab.label }}</span>
+        <component :is="tab.icon" class="w-6 h-6 transition-transform duration-300 ease-out" />
+        <span class="text-[10px] font-medium">{{ tab.label }}</span>
       </button>
     </nav>
   </div>
@@ -79,136 +82,44 @@ const tabs: Array<{ key: PanelType; label: string; icon: string }> = [
 
 <style scoped>
 .app-container {
-  width: 100%;
-  height: 100%;
-  position: relative;
-  overflow: hidden;
-}
-
-.map-layer {
-  position: absolute;
-  inset: 0;
-  bottom: 56px;
-}
-
-.panel-overlay {
-  position: absolute;
-  inset: 0;
-  bottom: 56px;
-  z-index: 30;
-  display: flex;
-  pointer-events: none;
-}
-
-.panel-backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.3);
-  pointer-events: auto;
-}
-
-@media (min-width: 768px) {
-  .panel-backdrop {
-    display: none;
-  }
-}
-
-.panel-content {
-  position: relative;
-  width: 100%;
-  max-width: 420px;
-  background: var(--panel-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  pointer-events: auto;
-  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  border-right: 1px solid var(--panel-border);
-}
-
-@media (max-width: 767px) {
-  .panel-content {
-    max-width: 100%;
-  }
-}
-
-.slide-enter-active,
-.slide-leave-active {
-  transition: transform 0.3s ease, opacity 0.3s ease;
-}
-
-.slide-enter-from,
-.slide-leave-to {
-  transform: translateX(-100%);
-  opacity: 0;
-}
-
-.tab-bar {
-  position: absolute;
-  bottom: calc(16px + var(--safe-bottom));
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  height: 64px;
-  width: calc(100% - 32px);
-  max-width: 400px;
-  background: var(--panel-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--panel-border);
-  border-radius: 32px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-  flex-shrink: 0;
-  z-index: 40;
+  /* Using tailwind classes primarily, keep minimal scoped css */
 }
 
 .tab-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  width: 60px;
-  height: 100%;
-  border: none;
-  background: none;
   color: var(--color-text-secondary);
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
   -webkit-tap-highlight-color: transparent;
 }
-
 .tab-item.active {
   color: var(--color-primary);
-  transform: scale(1.05);
+}
+.tab-item.active svg {
+  transform: scale(1.15) translateY(-2px);
+  stroke-width: 2.5;
 }
 
-.tab-icon {
-  font-size: 22px;
-  line-height: 1;
+/* Animations */
+.slide-fade-enter-active {
+  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.slide-fade-leave-active {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.slide-fade-enter-from {
+  opacity: 0;
+  transform: translateY(20px) scale(0.98);
+}
+.slide-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.98);
 }
 
-.tab-label {
-  font-weight: 500;
+.toast-enter-active,
+.toast-leave-active {
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-
-.sync-toast {
-  position: absolute;
-  top: calc(16px + var(--safe-top));
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 10px 20px;
-  background: var(--color-primary);
-  color: white;
-  border-radius: 8px;
-  font-size: 14px;
-  z-index: 50;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-  white-space: nowrap;
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translate(-50%, -20px);
 }
 </style>

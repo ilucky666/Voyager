@@ -16,6 +16,9 @@ const travelStore = useTravelStore()
     </div>
     <div class="stat-divider"></div>
     <div class="stat-item">
+      <span class="stat-text">国 {{ travelStore.visitedByLevel.country }}</span>
+    </div>
+    <div class="stat-item">
       <span class="stat-text">省 {{ travelStore.visitedByLevel.province }}</span>
     </div>
     <div class="stat-item">

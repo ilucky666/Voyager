@@ -11,27 +11,45 @@ export const useTravelStore = defineStore('travel', () => {
   const wishlistPlaces = computed(() => places.value.filter(p => p.type === 'wishlist'))
 
   const visitedByLevel = computed(() => {
+    const countrySet = new Set<string>()
     const provinceSet = new Set<string>()
     const citySet = new Set<string>()
     let countyCount = 0
     visitedPlaces.value.forEach(p => {
-      if (p.adcode.length >= 2) provinceSet.add(p.adcode.substring(0, 2))
-      if (p.adcode.length >= 4) citySet.add(p.adcode.substring(0, 4))
+      if (p.countryCode) {
+        countrySet.add(p.countryCode)
+      } else if (p.level === 'country') {
+        countrySet.add(p.adcode)
+      } else {
+        countrySet.add('CN')
+      }
+
+      provinceSet.add(p.adcode.includes('-') ? p.adcode : p.adcode.substring(0, 2))
+      if (p.adcode.length >= 4 && !p.adcode.includes('-')) citySet.add(p.adcode.substring(0, 4))
       countyCount++
     })
-    return { province: provinceSet.size, city: citySet.size, county: countyCount }
+    return { country: countrySet.size, province: provinceSet.size, city: citySet.size, county: countyCount }
   })
 
   const wishlistByLevel = computed(() => {
+    const countrySet = new Set<string>()
     const provinceSet = new Set<string>()
     const citySet = new Set<string>()
     let countyCount = 0
     wishlistPlaces.value.forEach(p => {
-      if (p.adcode.length >= 2) provinceSet.add(p.adcode.substring(0, 2))
-      if (p.adcode.length >= 4) citySet.add(p.adcode.substring(0, 4))
+      if (p.countryCode) {
+        countrySet.add(p.countryCode)
+      } else if (p.level === 'country') {
+        countrySet.add(p.adcode)
+      } else {
+        countrySet.add('CN')
+      }
+
+      provinceSet.add(p.adcode.includes('-') ? p.adcode : p.adcode.substring(0, 2))
+      if (p.adcode.length >= 4 && !p.adcode.includes('-')) citySet.add(p.adcode.substring(0, 4))
       countyCount++
     })
-    return { province: provinceSet.size, city: citySet.size, county: countyCount }
+    return { country: countrySet.size, province: provinceSet.size, city: citySet.size, county: countyCount }
   })
 
   function getPlaceByAdcode(adcode: string): TravelPlace | undefined {
@@ -47,30 +65,62 @@ export const useTravelStore = defineStore('travel', () => {
     featureAdcode: string,
     featureLevel: AdminLevel
   ): PlaceType | 'none' {
-    if (featureLevel === 'county') {
-      return getPlaceTypeByAdcode(featureAdcode)
-    }
+    // 1. Direct match first
+    const directPlace = getPlaceByAdcode(featureAdcode)
+    if (directPlace) return directPlace.type
 
-    const prefixLength = featureLevel === 'province' ? 2 : 4
-    const prefix = featureAdcode.substring(0, prefixLength)
-
-    let hasVisited = false
-    let hasWishlist = false
-
-    for (const place of places.value) {
-      if (place.level !== 'county') continue
-
-      if (place.adcode.startsWith(prefix)) {
-        if (place.type === 'visited') hasVisited = true
-        else if (place.type === 'wishlist') hasWishlist = true
+    // 2. Country aggregation
+    if (featureLevel === 'country') {
+      let hasVisited = false
+      let hasWishlist = false
+      for (const place of places.value) {
+        const isMatch = place.countryCode === featureAdcode || place.adcode === featureAdcode || (featureAdcode === 'CN' && !place.adcode.includes('-') && place.level !== 'country')
+        if (isMatch) {
+          if (place.type === 'visited') hasVisited = true
+          else if (place.type === 'wishlist') hasWishlist = true
+        }
+        if (hasVisited) break
       }
-
-      if (hasVisited) break
+      if (hasVisited) return 'visited'
+      if (hasWishlist) return 'wishlist'
+      return 'none'
     }
 
-    if (hasVisited) return 'visited'
-    if (hasWishlist) return 'wishlist'
-    return 'none'
+    // 3. Province / City / County aggregation for sub-regions
+    if (featureLevel === 'province') {
+      let hasVisited = false
+      let hasWishlist = false
+      const prefix = featureAdcode.substring(0, 2)
+      for (const place of places.value) {
+        if (place.adcode === featureAdcode || (!place.adcode.includes('-') && place.adcode.startsWith(prefix))) {
+          if (place.type === 'visited') hasVisited = true
+          else if (place.type === 'wishlist') hasWishlist = true
+        }
+        if (hasVisited) break
+      }
+      if (hasVisited) return 'visited'
+      if (hasWishlist) return 'wishlist'
+      return 'none'
+    }
+
+    // 4. City aggregation for sub-regions (counties)
+    if (featureLevel === 'city') {
+      let hasVisited = false
+      let hasWishlist = false
+      const prefix = featureAdcode.substring(0, 4)
+      for (const place of places.value) {
+        if (place.adcode === featureAdcode || (!place.adcode.includes('-') && place.adcode.startsWith(prefix))) {
+          if (place.type === 'visited') hasVisited = true
+          else if (place.type === 'wishlist') hasWishlist = true
+        }
+        if (hasVisited) break
+      }
+      if (hasVisited) return 'visited'
+      if (hasWishlist) return 'wishlist'
+      return 'none'
+    }
+
+    return getPlaceTypeByAdcode(featureAdcode)
   }
 
   async function loadPlaces() {

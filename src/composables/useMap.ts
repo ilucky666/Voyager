@@ -136,16 +136,21 @@ export function useMap(containerId: string) {
           'fill-color': [
             'match',
             ['get', 'placeType'],
-            'visited', '#34a853',
-            'wishlist', '#fbbc04',
-            'rgba(200, 200, 200, 0.15)',
+            'visited', '#34c759',
+            'wishlist', '#ff9500',
+            'rgba(200, 200, 200, 0.1)',
           ],
           'fill-opacity': [
-            'match',
-            ['get', 'placeType'],
-            'visited', 0.45,
-            'wishlist', 0.45,
-            0.08,
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            0.6,
+            [
+              'match',
+              ['get', 'placeType'],
+              'visited', 0.45,
+              'wishlist', 0.45,
+              0.05,
+            ]
           ],
         },
       })
@@ -158,16 +163,21 @@ export function useMap(containerId: string) {
           'line-color': [
             'match',
             ['get', 'placeType'],
-            'visited', '#34a853',
-            'wishlist', '#fbbc04',
-            mapStore.darkMode ? '#555' : '#999',
+            'visited', '#30d158',
+            'wishlist', '#ff9f0a',
+            mapStore.darkMode ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)',
           ],
           'line-width': [
-            'match',
-            ['get', 'placeType'],
-            'visited', 2,
-            'wishlist', 2,
-            0.8,
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            3,
+            [
+              'match',
+              ['get', 'placeType'],
+              'visited', 2,
+              'wishlist', 2,
+              1,
+            ]
           ],
           'line-opacity': 0.9,
         },
@@ -181,19 +191,47 @@ export function useMap(containerId: string) {
           'text-field': ['get', 'name'],
           'text-size': [
             'interpolate', ['linear'], ['zoom'],
-            3, level === 'county' ? 8 : 10,
-            6, level === 'county' ? 10 : 12,
-            10, 14,
+            3, level === 'county' ? 9 : 11,
+            6, level === 'county' ? 11 : 13,
+            10, 15,
           ],
           'text-allow-overlap': false,
           'text-ignore-placement': false,
         },
         paint: {
-          'text-color': mapStore.darkMode ? '#ccc' : '#333',
-          'text-halo-color': mapStore.darkMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.9)',
+          'text-color': mapStore.darkMode ? '#ffffff' : '#000000',
+          'text-halo-color': mapStore.darkMode ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.95)',
           'text-halo-width': 1.5,
         },
       })
+      
+      let hoveredStateId: string | number | null = null;
+      
+      map.on('mousemove', 'admin-fill', (e) => {
+        if (e.features && e.features.length > 0) {
+          if (hoveredStateId !== null) {
+            map!.setFeatureState(
+              { source: 'admin-source', id: hoveredStateId },
+              { hover: false }
+            );
+          }
+          hoveredStateId = e.features[0].id as string | number;
+          map!.setFeatureState(
+            { source: 'admin-source', id: hoveredStateId },
+            { hover: true }
+          );
+        }
+      });
+      
+      map.on('mouseleave', 'admin-fill', () => {
+        if (hoveredStateId !== null) {
+          map!.setFeatureState(
+            { source: 'admin-source', id: hoveredStateId },
+            { hover: false }
+          );
+        }
+        hoveredStateId = null;
+      });
     } catch (err) {
       console.error('Failed to load admin layer:', err)
     } finally {
@@ -205,17 +243,21 @@ export function useMap(containerId: string) {
     geojson: GeoJSON.FeatureCollection,
     level: AdminLevel
   ): GeoJSON.FeatureCollection {
-    const features = geojson.features.map(f => {
+    const features = geojson.features.map((f, index) => {
       const adcode = extractAdcode(f)
       const placeType = travelStore.getAggregatedPlaceType(adcode, level)
-      const numId = parseInt(adcode, 10)
+      const center = extractCenter(f)
+      const name = extractName(f)
+
       return {
         type: 'Feature' as const,
-        id: isNaN(numId) ? undefined : numId,
+        id: adcode || index + 1,
         properties: {
-          name: extractName(f),
+          ...f.properties,
+          name,
           adcode,
-          level: f.properties?.level || '',
+          center,
+          level: f.properties?.level || level,
           placeType,
         },
         geometry: f.geometry,
