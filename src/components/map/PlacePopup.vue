@@ -2,7 +2,7 @@
 import type { TravelPlace, AdminLevel } from '@/types'
 import type { UNESCOHeritageItem } from '@/composables/usePlaceDetails'
 
-import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
+import { ref, watch, computed, onMounted, onUnmounted, type CSSProperties } from 'vue'
 import { useTravelStore } from '@/stores/travel'
 import { Sparkles, Landmark, Compass, Calendar, FileText, Check, Star, Trash2, Edit3, X } from 'lucide-vue-next'
 
@@ -127,7 +127,7 @@ function onPointerUp() {
   window.removeEventListener('pointerup', onPointerUp)
 }
 
-const cardStyle = computed(() => {
+const cardStyle = computed<CSSProperties>(() => {
   if (isMobile.value) {
     return { position: 'relative', margin: '0 auto' }
   }
@@ -193,7 +193,7 @@ const cardStyle = computed(() => {
           
           <!-- Top Attractions -->
           <div v-if="isLoadingWiki" class="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl animate-pulse shadow-2xs h-16"></div>
-          <div v-else-if="(liveAttractions.length > 0 || attractions) && (liveAttractions.length > 0 || (attractions && attractions.length > 0 && !['老城广场', '历史中心', '自然公园', '皇家风景区', '地标', '中心广场', '传统集市', '行政中心'].some(p => attractions.join('').includes(p))))" class="p-3 bg-amber-50/95 dark:bg-amber-950/70 border border-amber-300/80 dark:border-amber-800 rounded-xl shadow-2xs">
+          <div v-else-if="(liveAttractions.length > 0 || attractions) && (liveAttractions.length > 0 || (attractions && attractions.length > 0 && !['老城广场', '历史中心', '自然公园', '皇家风景区', '地标', '中心广场', '传统集市', '行政中心'].some(p => attractions!.join('').includes(p))))" class="p-3 bg-amber-50/95 dark:bg-amber-950/70 border border-amber-300/80 dark:border-amber-800 rounded-xl shadow-2xs">
             <div class="flex items-center gap-1.5 text-xs font-black text-amber-900 dark:text-amber-200 mb-2">
               <Sparkles class="w-4 h-4 text-amber-600 dark:text-amber-400" />
               <span>知名景点与打卡名胜</span>
@@ -238,7 +238,7 @@ const cardStyle = computed(() => {
 
           <!-- Rare Landscapes & Cultural Experiences -->
           <div v-if="isLoadingWiki" class="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl animate-pulse shadow-2xs h-16"></div>
-          <div v-else-if="experiences && experiences.length > 0 && !['体验原汁原味的当地生活', '深入了解'].some(p => experiences.join('').includes(p))" class="p-3 bg-indigo-50/95 dark:bg-indigo-950/70 border border-indigo-300/80 dark:border-indigo-800 rounded-xl shadow-2xs">
+          <div v-else-if="experiences && experiences.length > 0 && !['体验原汁原味的当地生活', '深入了解'].some(p => experiences!.join('').includes(p))" class="p-3 bg-indigo-50/95 dark:bg-indigo-950/70 border border-indigo-300/80 dark:border-indigo-800 rounded-xl shadow-2xs">
             <div class="flex items-center gap-1.5 text-xs font-black text-indigo-900 dark:text-indigo-200 mb-2">
               <Compass class="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
               <span>罕见自然景观与人文体验</span>

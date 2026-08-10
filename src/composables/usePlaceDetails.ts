@@ -25,7 +25,7 @@ export async function loadPlaceDetails(): Promise<Record<string, PlaceDetailInfo
 
   loadingDetails.value = true
   try {
-    const resp = await fetch('/geo/province-details.json')
+    const resp = await fetch(`/geo/province-details.json?v=${Date.now()}`)
     if (resp.ok) {
       detailsCache.value = await resp.json()
     } else {
