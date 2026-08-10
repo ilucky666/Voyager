@@ -17,11 +17,13 @@ Voyager 是一款**本地优先 (Local-first)** 的旅行足迹管理与 WebGIS 
 
 ### ✨ 核心特性
 
-- 🗺️ **精准的行政区划管理**：支持省、市、县（区）三级联动，并在 3D WebGIS 地图上直观展示你的旅行足迹（想去 / 去过）。
-- 📝 **旅行手记与时间轴**：不仅是打卡点，你还可以为每一个足迹添加详细的“游玩日期”和“旅行日记”。
-- 📱 **原生级 PWA 体验**：支持保存到 iOS/Android 桌面，脱离浏览器边框，提供丝滑的物理弹性动画和全屏体验。
-- ☁️ **WebDAV 永久云同步**：内置 WebDAV 客户端。你可以绑定坚果云、Nextcloud 等第三方网盘，随时将本地足迹安全地永久备份到你自己的云端，拒绝数据被大厂绑架。
-- ⚡ **跨端二维码秒传**：PC 与手机数据不互通？只需在 PC 上生成高度压缩的同步二维码，手机相机一扫即可瞬间完成数据迁移。
+- 🗺️ **全球 4D 旅游知识图谱**：内置全球多达 4006 个省份/地区的结构化文案，覆盖东南亚、欧美、非洲等全球各大洲，全部由真实 AI 提取和总结了当地的核心游玩体验与著名地标。
+- 🏛️ **精准的联合国世界遗产映射**：收录并自动匹配了高达 1647 处国内外 UNESCO 世界自然与文化遗产。原生支持中英双语，为您揭示每个偏远省份隐藏的史诗级风景。
+- 📍 **精细化行政区划管理**：不仅支持全球省州级记录，更针对国内地图支持省、市、县（区）三级下钻联动，在 3D WebGIS 引擎的加持下呈现您的“去过”与“想去”足迹。
+- 📝 **旅行手记与时间轴**：不再只是冷冰冰的打卡点。您可以为每一次踏足添加详尽的“游玩日期”和“旅行日记”，构建您的私人旅行回忆录。
+- 📱 **原生级 PWA 沉浸体验**：完全支持 PWA (Progressive Web App)，可直接安装到 iOS/Android 手机桌面。脱离浏览器边框，拥有丝滑的物理弹性动画和磨砂玻璃 (Glassmorphism) UI 设计。
+- ☁️ **WebDAV 永久云同步 (BYOC)**：自带 WebDAV 客户端，不依赖特定服务商。您可以绑定坚果云、Nextcloud 或群晖 NAS 等私人网盘，将本地足迹安全、永久地备份到您自己的云端。
+- ⚡ **跨端二维码秒传**：电脑和手机数据不互通？只需在 PC 上生成经过极度压缩加密的二维码，手机端扫码即可瞬间完成庞大足迹数据的秒级同步。
 
 ### 🚀 如何运行
 
@@ -53,11 +55,13 @@ Voyager is a **Local-first** travel footprint management and WebGIS visualizatio
 
 ### ✨ Key Features
 
-- 🗺️ **Administrative Division Tracking**: Mark places you've visited or wish to visit at the provincial, municipal, and county levels across China, displayed beautifully on a 3D WebGIS map.
-- 📝 **Travel Journals & Timeline**: Log specific visit dates and write travel notes for every footprint you leave behind.
-- 📱 **Native-like PWA**: Installable on iOS/Android home screens. Enjoy physics-based micro-animations and a full-screen, borderless interface.
-- ☁️ **WebDAV Cloud Sync**: Features a built-in WebDAV client. Bring Your Own Cloud (BYOC) by connecting services like Nextcloud or Jianguoyun to securely backup your data permanently. Keep your data in your own hands.
-- ⚡ **QR Code Quick Transfer**: Seamlessly transfer footprint data between your PC and phone by scanning a highly compressed QR code.
+- 🗺️ **Global 4D Travel Knowledge Graph**: Built-in structured data for up to 4,006 provinces and regions worldwide. Every obscure province across Southeast Asia, Europe, Africa, and the Americas has been processed by genuine AI to summarize core travel experiences and landmarks.
+- 🏛️ **Precise UNESCO World Heritage Mapping**: Contains meticulously matched data for over 1,647 UNESCO Natural and Cultural Heritage sites. Native bilingual (English & Chinese) support uncovers hidden epic landscapes in every corner of the globe.
+- 📍 **Administrative Division Tracking**: Offers tracking at the provincial/state level globally, and drills down to municipal and county levels for specific countries (e.g., China). Displayed beautifully on a high-performance 3D WebGIS engine.
+- 📝 **Travel Journals & Timeline**: More than just check-ins. Log specific visit dates and craft detailed travel notes for every footprint to build your private travel memoir.
+- 📱 **Native-like PWA Immersion**: Fully installable as a Progressive Web App on iOS/Android home screens. Enjoy physics-based micro-animations and a stunning, borderless Glassmorphism UI design.
+- ☁️ **WebDAV Cloud Sync (BYOC)**: Features a built-in WebDAV client. Bring Your Own Cloud by connecting services like Nextcloud, Synology NAS, or Jianguoyun to securely and permanently back up your data. Keep your footprints strictly in your own hands.
+- ⚡ **QR Code Quick Transfer**: Seamlessly transfer massive footprint data between your PC and phone by scanning a highly compressed, secure QR code. No backend servers required.
 
 ### 🚀 Getting Started
 
