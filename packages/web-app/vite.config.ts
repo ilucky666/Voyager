@@ -1,20 +1,25 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { resolve } from 'path'
 
-export default defineConfig({
-  server: {
-    host: true,
-    proxy: {
-      '/webdav-proxy': {
-        target: 'https://dav.jianguoyun.com',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/webdav-proxy/, '')
+export default defineConfig(({ mode }) => {
+  // Load env file based on `mode` in the current working directory.
+  // Set the third parameter to '' to load all env regardless of the `VITE_` prefix.
+  const env = loadEnv(mode, process.cwd(), '')
+  
+  return {
+    server: {
+      host: true,
+      proxy: {
+        '/webdav-proxy': {
+          target: env.VITE_WEBDAV_PROXY_TARGET || 'https://dav.jianguoyun.com',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/webdav-proxy/, '')
+        }
       }
-    }
-  },
+    },
   plugins: [
     vue(),
     tailwindcss(),
@@ -69,7 +74,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      '@': resolve(__dirname, 'src')
+      '@': resolve(import.meta.dirname, 'src')
     }
   },
   build: {
@@ -80,6 +85,7 @@ export default defineConfig({
           'vendor': ['vue', 'vue-router', 'pinia', 'dexie'],
         }
       }
+    }
     }
   }
 })

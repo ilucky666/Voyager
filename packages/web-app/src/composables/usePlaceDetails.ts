@@ -15,6 +15,7 @@ export interface PlaceDetailInfo {
   attractions?: string[]
   heritage?: (string | UNESCOHeritageItem)[]
   experiences?: string[]
+  scenic5A?: string[]
 }
 
 const detailsCache = ref<Record<string, PlaceDetailInfo> | null>(null)

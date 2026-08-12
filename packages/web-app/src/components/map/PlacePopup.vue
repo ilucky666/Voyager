@@ -13,6 +13,7 @@ const props = defineProps<{
   summary?: string
   attractions?: string[]
   heritage?: (string | UNESCOHeritageItem)[]
+  scenic5A?: string[]
   experiences?: string[]
   adcode: string
   existingPlace: TravelPlace | null | undefined
@@ -233,6 +234,19 @@ const cardStyle = computed<CSSProperties>(() => {
                   </span>
                 </template>
               </div>
+            </div>
+          </div>
+
+          <!-- 5A Scenic Spots -->
+          <div v-if="scenic5A && scenic5A.length > 0" class="p-3 bg-orange-50 dark:bg-orange-950/70 border border-orange-300 dark:border-orange-800 rounded-xl shadow-2xs">
+            <div class="flex items-center gap-1.5 text-xs font-black text-orange-900 dark:text-orange-200 mb-2">
+              <Star class="w-4 h-4 text-orange-600 dark:text-orange-400 fill-orange-600 dark:fill-orange-400" />
+              <span>国家 5A 级景区</span>
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+              <span v-for="item in scenic5A" :key="item" class="px-2.5 py-1 bg-white dark:bg-slate-900 text-[11px] font-bold text-slate-900 dark:text-slate-100 border border-orange-300 dark:border-orange-700 rounded-lg shadow-2xs flex items-center gap-1">
+                <span class="text-orange-600 dark:text-orange-400">🏅</span> {{ item }}
+              </span>
             </div>
           </div>
 

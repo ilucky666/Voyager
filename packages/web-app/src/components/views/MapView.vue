@@ -63,6 +63,7 @@ const selectedSummary = computed(() => {
 const selectedAttractions = computed(() => selectedDetailInfo.value?.attractions)
 const selectedHeritage = computed(() => selectedDetailInfo.value?.heritage)
 const selectedExperiences = computed(() => selectedDetailInfo.value?.experiences)
+const selectedScenic5A = computed(() => selectedDetailInfo.value?.scenic5A)
 
 const selectedLevel = computed<AdminLevel>(() => {
   return mapStore.currentLevel
@@ -226,6 +227,7 @@ function handleSwitchLevel(level: AdminLevel) {
       :summary="selectedSummary"
       :attractions="selectedAttractions"
       :heritage="selectedHeritage"
+      :scenic5A="selectedScenic5A"
       :experiences="selectedExperiences"
       :adcode="selectedAdcode"
       :existing-place="existingPlace"
