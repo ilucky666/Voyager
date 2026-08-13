@@ -1,5 +1,5 @@
 [build]
-  command = "rm -rf node_modules package-lock.json && npm install && npm --workspace=packages/web-app run build"
+  command = "rm -rf node_modules package-lock.json packages/web-app/node_modules packages/web-app/package-lock.json && npm install && npm --workspace=packages/web-app run build"
   publish = "packages/web-app/dist"
 
 [[redirects]]
