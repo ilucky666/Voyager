@@ -1,0 +1,8 @@
+[build]
+  command = "npm --workspace=packages/web-app run build"
+  publish = "packages/web-app/dist"
+
+[[redirects]]
+  from = "/webdav-proxy/*"
+  to = "https://dav.jianguoyun.com/:splat"
+  status = 200
