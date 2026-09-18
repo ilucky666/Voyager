@@ -115,7 +115,7 @@ function flyToPlace(adcode: string) {
 </script>
 
 <template>
-  <div class="flex flex-col h-full pt-[env(safe-area-inset-top,0px)]">
+  <div class="flex flex-col h-full">
     <div class="px-5 py-4 flex items-center justify-between flex-shrink-0">
       <h1 class="text-[28px] font-bold tracking-tight">旅行规划</h1>
       <span class="px-2.5 py-1 bg-orange-100 dark:bg-orange-900/30 rounded-full text-xs font-semibold text-orange-600 dark:text-orange-400">{{ wishlistPlaces.length }} 想去</span>
@@ -125,7 +125,7 @@ function flyToPlace(adcode: string) {
       <SearchBox />
     </div>
 
-    <div class="flex-1 overflow-y-auto px-4 pb-24 scroll-smooth">
+    <div class="flex-1 overflow-y-auto px-4 pb-[calc(80px+env(safe-area-inset-bottom,0px))] md:pb-6 scroll-smooth iOS-scroll">
       <div v-if="wishlistPlaces.length === 0 && routes.length === 0" class="flex flex-col items-center justify-center py-20 text-gray-400">
         <Plane class="w-16 h-16 mb-4 opacity-50" />
         <p class="font-medium text-[15px]">暂无规划</p>

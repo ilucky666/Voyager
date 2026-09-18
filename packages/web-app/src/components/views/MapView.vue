@@ -4,7 +4,7 @@ import { useMap } from '@/composables/useMap'
 import { useMapStore } from '@/stores/map'
 import { useTravelStore } from '@/stores/travel'
 import { loadGeoJSON, extractAdcode, extractName, extractCenter, getBoundsFromGeometry } from '@/composables/useGeoJSON'
-import { loadPlaceDetails, getPlaceDetail } from '@/composables/usePlaceDetails'
+import { loadPlaceDetails, getPlaceDetail, loadingDetails } from '@/composables/usePlaceDetails'
 import LevelSwitcher from '../map/LevelSwitcher.vue'
 import PlacePopup from '../map/PlacePopup.vue'
 import StatsBar from '../map/StatsBar.vue'
@@ -20,6 +20,17 @@ const route = useRoute()
 onMounted(async () => {
   await loadPlaceDetails()
 })
+
+function inferAdminLevel(adcode: string): AdminLevel {
+  if (adcode.length === 2) return 'country'
+  if (adcode.includes('-')) return 'province'
+  if (/^\d{6}$/.test(adcode)) {
+    if (adcode.endsWith('0000')) return 'province'
+    if (adcode.endsWith('00')) return 'city'
+    return 'county'
+  }
+  return 'province'
+}
 
 const selectedAdcode = computed(() => {
   if (!selectedFeature.value) return ''
@@ -64,6 +75,7 @@ const selectedAttractions = computed(() => selectedDetailInfo.value?.attractions
 const selectedHeritage = computed(() => selectedDetailInfo.value?.heritage)
 const selectedExperiences = computed(() => selectedDetailInfo.value?.experiences)
 const selectedScenic5A = computed(() => selectedDetailInfo.value?.scenic5A)
+const selectedCuisines = computed(() => selectedDetailInfo.value?.cuisines)
 
 const selectedLevel = computed<AdminLevel>(() => {
   return mapStore.currentLevel
@@ -107,11 +119,11 @@ watch(selectedFeature, (newFeature) => {
   }
 })
 
-// Listen to route query to fly to a specific place if opened from footprint
-watch(() => route.query.adcode, async (newAdcode) => {
-  if (newAdcode && typeof newAdcode === 'string' && mapReady.value) {
+// Listen to route query to fly to a specific place if opened from footprint or search
+watch([() => route.query.adcode, mapReady], async ([newAdcode, isReady]) => {
+  if (newAdcode && typeof newAdcode === 'string' && isReady) {
     let place = travelStore.getPlaceByAdcode(newAdcode)
-    let targetLevel: AdminLevel = place?.level || (newAdcode.length === 2 ? 'country' : (newAdcode.includes('-') ? 'province' : 'county'))
+    let targetLevel: AdminLevel = place?.level || inferAdminLevel(newAdcode)
 
     if (mapStore.currentLevel !== targetLevel) {
       await switchLevel(targetLevel)
@@ -229,10 +241,12 @@ function handleSwitchLevel(level: AdminLevel) {
       :heritage="selectedHeritage"
       :scenic5A="selectedScenic5A"
       :experiences="selectedExperiences"
+      :cuisines="selectedCuisines"
       :adcode="selectedAdcode"
       :existing-place="existingPlace"
       :is-county-level="isCountyLevel"
       :current-level="selectedLevel"
+      :loading-details="loadingDetails"
       @add-visited="addAsVisited"
       @add-wishlist="addAsWishlist"
       @remove="removePlace"

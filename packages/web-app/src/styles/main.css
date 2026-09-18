@@ -37,6 +37,13 @@ html, body, #app {
   background: var(--color-bg);
   color: var(--color-text);
   -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.iOS-scroll {
+  -webkit-overflow-scrolling: touch;
 }
 
 .maplibregl-map {
@@ -69,6 +76,7 @@ html, body, #app {
 /* Form Elements */
 input, textarea, select {
   @apply bg-[rgba(142,142,147,0.12)] border border-transparent rounded-xl px-3.5 py-2.5 text-[15px] text-(--color-text) outline-none transition-all w-full;
+  user-select: text;
 }
 input:focus, textarea:focus, select:focus {
   @apply border-(--color-primary) bg-(--color-bg-secondary) shadow-[0_0_0_3px_rgba(0,122,255,0.2)];

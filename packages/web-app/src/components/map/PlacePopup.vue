@@ -4,7 +4,7 @@ import type { UNESCOHeritageItem } from '@/composables/usePlaceDetails'
 
 import { ref, watch, computed, onMounted, onUnmounted, type CSSProperties } from 'vue'
 import { useTravelStore } from '@/stores/travel'
-import { Sparkles, Landmark, Compass, Calendar, FileText, Check, Star, Trash2, Edit3, X } from 'lucide-vue-next'
+import { Sparkles, Landmark, Compass, Calendar, FileText, Check, Star, Trash2, Edit3, X, UtensilsCrossed } from 'lucide-vue-next'
 
 const props = defineProps<{
   name: string
@@ -15,10 +15,12 @@ const props = defineProps<{
   heritage?: (string | UNESCOHeritageItem)[]
   scenic5A?: string[]
   experiences?: string[]
+  cuisines?: string[]
   adcode: string
   existingPlace: TravelPlace | null | undefined
   isCountyLevel: boolean
   currentLevel: AdminLevel
+  loadingDetails?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -181,6 +183,16 @@ const cardStyle = computed<CSSProperties>(() => {
 
       <!-- Scrollable Content Body -->
       <div class="popup-body max-h-[58vh] overflow-y-auto pr-1 my-2 scroll-smooth">
+        <!-- Loading skeleton while province details are downloading -->
+        <div v-if="loadingDetails && !attractions?.length && !heritage?.length && !experiences?.length" class="space-y-3 mb-3 animate-pulse">
+          <div class="h-12 bg-blue-50 dark:bg-blue-950/60 rounded-xl border border-blue-200/60 dark:border-blue-800/60 flex items-center px-3.5 gap-2.5 text-xs font-semibold text-blue-600 dark:text-blue-400">
+            <span class="inline-block w-3.5 h-3.5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin flex-shrink-0"></span>
+            <span>正在加载该地区旅行百科与名胜遗产...</span>
+          </div>
+          <div class="h-16 bg-slate-100 dark:bg-slate-800/60 rounded-xl"></div>
+          <div class="h-14 bg-slate-100 dark:bg-slate-800/60 rounded-xl"></div>
+        </div>
+
         <!-- 1. Summary Quote Box -->
         <div v-if="isLoadingWiki" class="p-3 bg-slate-50 dark:bg-slate-900 border-l-4 border-slate-400 rounded-r-xl text-xs font-semibold text-slate-500 animate-pulse mb-3 shadow-2xs">
           正在为您实时获取真实百科介绍...
@@ -194,7 +206,7 @@ const cardStyle = computed<CSSProperties>(() => {
           
           <!-- Top Attractions -->
           <div v-if="isLoadingWiki" class="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl animate-pulse shadow-2xs h-16"></div>
-          <div v-else-if="(liveAttractions.length > 0 || attractions) && (liveAttractions.length > 0 || (attractions && attractions.length > 0 && !['老城广场', '历史中心', '自然公园', '皇家风景区', '地标', '中心广场', '传统集市', '行政中心'].some(p => attractions!.join('').includes(p))))" class="p-3 bg-amber-50/95 dark:bg-amber-950/70 border border-amber-300/80 dark:border-amber-800 rounded-xl shadow-2xs">
+          <div v-else-if="(liveAttractions && liveAttractions.length > 0) || (attractions && attractions.length > 0)" class="p-3 bg-amber-50/95 dark:bg-amber-950/70 border border-amber-300/80 dark:border-amber-800 rounded-xl shadow-2xs">
             <div class="flex items-center gap-1.5 text-xs font-black text-amber-900 dark:text-amber-200 mb-2">
               <Sparkles class="w-4 h-4 text-amber-600 dark:text-amber-400" />
               <span>知名景点与打卡名胜</span>
@@ -252,7 +264,7 @@ const cardStyle = computed<CSSProperties>(() => {
 
           <!-- Rare Landscapes & Cultural Experiences -->
           <div v-if="isLoadingWiki" class="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl animate-pulse shadow-2xs h-16"></div>
-          <div v-else-if="experiences && experiences.length > 0 && !['体验原汁原味的当地生活', '深入了解'].some(p => experiences!.join('').includes(p))" class="p-3 bg-indigo-50/95 dark:bg-indigo-950/70 border border-indigo-300/80 dark:border-indigo-800 rounded-xl shadow-2xs">
+          <div v-else-if="experiences && experiences.length > 0" class="p-3 bg-indigo-50/95 dark:bg-indigo-950/70 border border-indigo-300/80 dark:border-indigo-800 rounded-xl shadow-2xs">
             <div class="flex items-center gap-1.5 text-xs font-black text-indigo-900 dark:text-indigo-200 mb-2">
               <Compass class="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
               <span>罕见自然景观与人文体验</span>
@@ -265,6 +277,19 @@ const cardStyle = computed<CSSProperties>(() => {
             </div>
           </div>
 
+          <!-- Local Food & Gourmet Guide -->
+          <div v-if="cuisines && cuisines.length > 0" class="p-3 bg-rose-50/95 dark:bg-rose-950/70 border border-rose-300/80 dark:border-rose-800 rounded-xl shadow-2xs">
+            <div class="flex items-center gap-1.5 text-xs font-black text-rose-900 dark:text-rose-200 mb-2">
+              <UtensilsCrossed class="w-4 h-4 text-rose-600 dark:text-rose-400" />
+              <span>特色风味与地道美食</span>
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+              <span v-for="item in cuisines" :key="item" class="px-2.5 py-1 bg-white dark:bg-slate-900 text-xs font-bold text-slate-900 dark:text-slate-100 border border-rose-300 dark:border-rose-700 rounded-lg shadow-2xs">
+                🍜 {{ item }}
+              </span>
+            </div>
+          </div>
+
         </div>
 
         <!-- Visited / Wishlist Status Badge -->
@@ -274,10 +299,6 @@ const cardStyle = computed<CSSProperties>(() => {
             <Star v-else class="w-3.5 h-3.5" />
             {{ existingPlace.type === 'visited' ? '已标记去过' : '已标记想去' }}
           </span>
-        </div>
-
-        <div v-if="!isCountyLevel" class="text-xs font-bold text-slate-800 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 p-2.5 rounded-lg mb-3 border border-slate-300 dark:border-slate-700">
-          💡 国内区域需切换到【县级】后方可精准标记
         </div>
 
         <!-- Existing Place Details / Edit Mode -->
@@ -327,7 +348,7 @@ const cardStyle = computed<CSSProperties>(() => {
       </div>
 
       <!-- Action Buttons for New Mark -->
-      <div class="popup-actions flex gap-2 pt-2 border-t border-slate-200 dark:border-slate-800" v-if="!existingPlace && isCountyLevel">
+      <div class="popup-actions flex gap-2 pt-2 border-t border-slate-200 dark:border-slate-800" v-if="!existingPlace">
         <button class="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-black transition-all shadow-md flex items-center justify-center gap-1.5" @click="emit('addVisited')">
           <Check class="w-4 h-4" />
           标记为已去

@@ -69,7 +69,7 @@ function flyToPlace(adcode: string) {
 </script>
 
 <template>
-  <div class="flex flex-col h-full pt-[env(safe-area-inset-top,0px)]">
+  <div class="flex flex-col h-full">
     <div class="px-5 py-4 flex items-center justify-between flex-shrink-0">
       <h1 class="text-[28px] font-bold tracking-tight">我的足迹</h1>
       <div class="flex gap-1.5 flex-wrap">
@@ -95,7 +95,7 @@ function flyToPlace(adcode: string) {
       </button>
     </div>
 
-    <div class="flex-1 overflow-y-auto px-4 pb-24 scroll-smooth">
+    <div class="flex-1 overflow-y-auto px-4 pb-[calc(80px+env(safe-area-inset-bottom,0px))] md:pb-6 scroll-smooth iOS-scroll">
       <div v-if="travelStore.visitedPlaces.length === 0" class="flex flex-col items-center justify-center py-20 text-gray-400">
         <Footprints class="w-16 h-16 mb-4 opacity-50" />
         <p class="font-medium text-[15px]">暂无足迹</p>

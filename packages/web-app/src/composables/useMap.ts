@@ -126,6 +126,7 @@ export function useMap(containerId: string) {
       map.addSource('admin-source', {
         type: 'geojson',
         data: enriched,
+        promoteId: 'adcode',
       })
 
       map.addLayer({

@@ -151,12 +151,12 @@ function showMessage(msg: string, type: 'success' | 'error') {
 </script>
 
 <template>
-  <div class="flex flex-col h-full pt-[env(safe-area-inset-top,0px)]">
+  <div class="flex flex-col h-full">
     <div class="px-5 py-4 flex items-center justify-between flex-shrink-0">
       <h1 class="text-[28px] font-bold tracking-tight">我的大盘</h1>
     </div>
 
-    <div class="flex-1 overflow-y-auto px-4 pb-24 scroll-smooth">
+    <div class="flex-1 overflow-y-auto px-4 pb-[calc(80px+env(safe-area-inset-bottom,0px))] md:pb-6 scroll-smooth iOS-scroll">
       
       <!-- Stats Dashboard -->
       <section class="mb-8">
