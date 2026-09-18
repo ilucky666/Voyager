@@ -123,22 +123,43 @@ watch(selectedFeature, (newFeature) => {
 watch([() => route.query.adcode, mapReady], async ([newAdcode, isReady]) => {
   if (newAdcode && typeof newAdcode === 'string' && isReady) {
     let place = travelStore.getPlaceByAdcode(newAdcode)
-    let targetLevel: AdminLevel = place?.level || inferAdminLevel(newAdcode)
+    let explicitLevel = route.query.level as AdminLevel | undefined
+    let targetLevel: AdminLevel = explicitLevel || place?.level || inferAdminLevel(newAdcode)
 
     if (mapStore.currentLevel !== targetLevel) {
       await switchLevel(targetLevel)
     }
 
     try {
-      const geojson = await loadGeoJSON(targetLevel)
-      const feature = geojson.features.find(f => extractAdcode(f) === newAdcode)
+      let geojson = await loadGeoJSON(targetLevel)
+      let feature = geojson.features.find(f => extractAdcode(f) === newAdcode)
+
+      // Fallback cross-check if level inferred did not match feature's actual file
+      if (!feature && targetLevel === 'county') {
+        const cityGeo = await loadGeoJSON('city')
+        const cityFeat = cityGeo.features.find(f => extractAdcode(f) === newAdcode)
+        if (cityFeat) {
+          await switchLevel('city')
+          geojson = cityGeo
+          feature = cityFeat
+        }
+      } else if (!feature && targetLevel === 'city') {
+        const countyGeo = await loadGeoJSON('county')
+        const countyFeat = countyGeo.features.find(f => extractAdcode(f) === newAdcode)
+        if (countyFeat) {
+          await switchLevel('county')
+          geojson = countyGeo
+          feature = countyFeat
+        }
+      }
+
       if (feature) {
         selectedFeature.value = feature
         const bounds = feature.geometry ? getBoundsFromGeometry(feature.geometry) : null
         if (bounds) {
           map()?.fitBounds(bounds, {
             padding: { top: 60, bottom: 200, left: 60, right: 60 },
-            pitch: targetLevel === 'country' ? 15 : 30,
+            pitch: mapStore.currentLevel === 'country' ? 15 : 30,
             duration: 1400,
             maxZoom: 11,
           })

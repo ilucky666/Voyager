@@ -22,13 +22,21 @@ const searchIndex = ref<SearchItem[]>([])
 
 onMounted(async () => {
   try {
-    // Load country and province data
-    const [countries, provinces] = await Promise.all([
+    // Load country, province and city data
+    const [countries, provinces, cities] = await Promise.all([
       loadGeoJSON('country'),
-      loadGeoJSON('province')
+      loadGeoJSON('province'),
+      loadGeoJSON('city')
     ])
 
     const items: SearchItem[] = []
+
+    const provinceNameMap = new Map<string, string>()
+    provinces.features.forEach(f => {
+      const code = extractAdcode(f)
+      const name = extractName(f)
+      if (code && name) provinceNameMap.set(code, name)
+    })
 
     countries.features.forEach(f => {
       const name = extractName(f)
@@ -57,6 +65,23 @@ onMounted(async () => {
           nameEn,
           level: 'province',
           searchText: `${name} ${nameEn} ${country}`.toLowerCase()
+        })
+      }
+    })
+
+    cities.features.forEach(f => {
+      const name = extractName(f)
+      const nameEn = String(f.properties?.name_en || '')
+      const adcode = extractAdcode(f)
+      const parentCode = String(f.properties?.parent?.adcode || '')
+      const parentProvince = parentCode ? provinceNameMap.get(parentCode) : ''
+      if (name && adcode) {
+        items.push({
+          adcode,
+          name: parentProvince ? `${name} (${parentProvince})` : name,
+          nameEn,
+          level: 'city',
+          searchText: `${name} ${nameEn} ${parentProvince}`.toLowerCase()
         })
       }
     })
@@ -107,8 +132,8 @@ const results = computed(() => {
 function onSelect(item: SearchItem) {
   isOpen.value = false
   query.value = ''
-  // Push path '/' and adcode to route, which will trigger MapView to load and fly to the place, and hide the plan overlay
-  router.push({ path: '/', query: { adcode: item.adcode } })
+  // Push path '/' and adcode + level to route, which will trigger MapView to load and fly to the place, and hide the plan overlay
+  router.push({ path: '/', query: { adcode: item.adcode, level: item.level } })
 }
 </script>
 
@@ -121,7 +146,7 @@ function onSelect(item: SearchItem) {
         v-model="query"
         @focus="isOpen = true"
         type="text" 
-        placeholder="搜索国家或省份..."
+        placeholder="搜索国家、省份或城市..."
         class="flex-1 bg-transparent border-none outline-none px-3 text-sm font-semibold text-slate-900 dark:text-slate-100 placeholder-slate-400"
       />
     </div>
@@ -139,11 +164,14 @@ function onSelect(item: SearchItem) {
       >
         <div class="flex items-center gap-2">
           <MapPin class="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
-          <span class="text-sm font-black text-slate-900 dark:text-slate-50">{{ item.name }}</span>
+          <span class="text-sm font-black text-slate-900 dark:text-slate-50 truncate">{{ item.name }}</span>
+          <span class="ml-auto text-[10px] px-1.5 py-0.5 rounded font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 flex-shrink-0">
+            {{ item.level === 'country' ? '国家' : (item.level === 'province' ? '省级' : '城市') }}
+          </span>
         </div>
         <div class="flex items-center gap-2 pl-5">
           <span class="text-[10px] font-bold text-slate-500">{{ item.adcode }}</span>
-          <span v-if="item.nameEn" class="text-[10px] font-medium text-slate-400 uppercase tracking-wider">{{ item.nameEn }}</span>
+          <span v-if="item.nameEn" class="text-[10px] font-medium text-slate-400 uppercase tracking-wider truncate">{{ item.nameEn }}</span>
         </div>
       </div>
     </div>
