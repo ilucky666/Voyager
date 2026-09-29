@@ -101,8 +101,14 @@ watch(selectedFeature, (newFeature) => {
   if (newFeature && map() && mapReady.value) {
     const bounds = newFeature.geometry ? getBoundsFromGeometry(newFeature.geometry) : null
     if (bounds) {
+      const isMobile = window.innerWidth < 768
       map()?.fitBounds(bounds, {
-        padding: { top: 60, bottom: 200, left: 60, right: 60 },
+        padding: {
+          top: 60,
+          bottom: isMobile ? 240 : 60,
+          left: isMobile ? 40 : 100,
+          right: isMobile ? 40 : 460
+        },
         pitch: mapStore.currentLevel === 'country' ? 15 : 30,
         duration: 1300,
         maxZoom: 11,
@@ -157,8 +163,14 @@ watch([() => route.query.adcode, mapReady], async ([newAdcode, isReady]) => {
         selectedFeature.value = feature
         const bounds = feature.geometry ? getBoundsFromGeometry(feature.geometry) : null
         if (bounds) {
+          const isMobile = window.innerWidth < 768
           map()?.fitBounds(bounds, {
-            padding: { top: 60, bottom: 200, left: 60, right: 60 },
+            padding: {
+              top: 60,
+              bottom: isMobile ? 240 : 60,
+              left: isMobile ? 40 : 100,
+              right: isMobile ? 40 : 460
+            },
             pitch: mapStore.currentLevel === 'country' ? 15 : 30,
             duration: 1400,
             maxZoom: 11,

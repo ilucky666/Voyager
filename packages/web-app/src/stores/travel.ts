@@ -67,7 +67,8 @@ export const useTravelStore = defineStore('travel', () => {
   })
 
   function getPlaceByAdcode(adcode: string): TravelPlace | undefined {
-    return places.value.find(p => p.adcode === adcode)
+    const codeStr = String(adcode || '')
+    return places.value.find(p => String(p.adcode || '') === codeStr)
   }
 
   function getPlaceTypeByAdcode(adcode: string): PlaceType | 'none' {
@@ -79,8 +80,10 @@ export const useTravelStore = defineStore('travel', () => {
     featureAdcode: string,
     featureLevel: AdminLevel
   ): PlaceType | 'none' {
+    const fCode = String(featureAdcode || '')
+
     // 1. Direct match first
-    const directPlace = getPlaceByAdcode(featureAdcode)
+    const directPlace = getPlaceByAdcode(fCode)
     if (directPlace) return directPlace.type
 
     // 2. Country aggregation
@@ -88,7 +91,8 @@ export const useTravelStore = defineStore('travel', () => {
       let hasVisited = false
       let hasWishlist = false
       for (const place of places.value) {
-        const isMatch = place.countryCode === featureAdcode || place.adcode === featureAdcode || (featureAdcode === 'CN' && !place.adcode.includes('-') && place.level !== 'country')
+        const pCode = String(place.adcode || '')
+        const isMatch = place.countryCode === fCode || pCode === fCode || (fCode === 'CN' && !pCode.includes('-') && place.level !== 'country')
         if (isMatch) {
           if (place.type === 'visited') hasVisited = true
           else if (place.type === 'wishlist') hasWishlist = true
@@ -104,9 +108,10 @@ export const useTravelStore = defineStore('travel', () => {
     if (featureLevel === 'province') {
       let hasVisited = false
       let hasWishlist = false
-      const prefix = featureAdcode.substring(0, 2)
+      const prefix = fCode.substring(0, 2)
       for (const place of places.value) {
-        if (place.adcode === featureAdcode || (!place.adcode.includes('-') && place.adcode.startsWith(prefix))) {
+        const pCode = String(place.adcode || '')
+        if (pCode === fCode || (!pCode.includes('-') && pCode.startsWith(prefix))) {
           if (place.type === 'visited') hasVisited = true
           else if (place.type === 'wishlist') hasWishlist = true
         }
@@ -121,11 +126,12 @@ export const useTravelStore = defineStore('travel', () => {
     if (featureLevel === 'city') {
       let hasVisited = false
       let hasWishlist = false
-      const prov = featureAdcode.substring(0, 2)
-      const isDirectAdmin = ['11', '12', '31', '50', '81', '82', '71'].includes(prov) && (featureAdcode.endsWith('0000') || featureAdcode.endsWith('00'))
-      const prefix = isDirectAdmin ? prov : featureAdcode.substring(0, 4)
+      const prov = fCode.substring(0, 2)
+      const isDirectAdmin = ['11', '12', '31', '50', '81', '82', '71'].includes(prov)
+      const prefix = isDirectAdmin ? prov : fCode.substring(0, 4)
       for (const place of places.value) {
-        if (place.adcode === featureAdcode || (!place.adcode.includes('-') && place.adcode.startsWith(prefix))) {
+        const pCode = String(place.adcode || '')
+        if (pCode === fCode || (!pCode.includes('-') && pCode.startsWith(prefix))) {
           if (place.type === 'visited') hasVisited = true
           else if (place.type === 'wishlist') hasWishlist = true
         }
@@ -136,7 +142,7 @@ export const useTravelStore = defineStore('travel', () => {
       return 'none'
     }
 
-    return getPlaceTypeByAdcode(featureAdcode)
+    return getPlaceTypeByAdcode(fCode)
   }
 
   async function loadPlaces() {

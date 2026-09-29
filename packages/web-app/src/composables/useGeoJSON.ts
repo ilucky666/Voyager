@@ -11,12 +11,14 @@ const LEVEL_FILES: Record<AdminLevel, string> = {
   county: 'all-districts.json',
 }
 
+const GEO_VERSION = '20260930_v4'
+
 export async function loadGeoJSON(level: AdminLevel): Promise<GeoJSON.FeatureCollection> {
   if (geoCache.has(level)) {
     return geoCache.get(level)!
   }
 
-  const url = `${GEO_BASE}/${LEVEL_FILES[level]}`
+  const url = `${GEO_BASE}/${LEVEL_FILES[level]}?v=${GEO_VERSION}`
   const resp = await fetch(url)
   if (!resp.ok) {
     throw new Error(`Failed to load GeoJSON: ${url} (${resp.status})`)

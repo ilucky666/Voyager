@@ -10,6 +10,6 @@
 [[headers]]
   for = "/geo/*"
   [headers.values]
-    Cache-Control = "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400"
+    Cache-Control = "public, max-age=0, must-revalidate"
     Access-Control-Allow-Origin = "*"
 

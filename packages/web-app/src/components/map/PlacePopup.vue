@@ -84,20 +84,48 @@ function getHeritageCategoryLabel(cat?: string) {
 }
 
 const isMobile = ref(false)
+const hasUserDragged = ref(false)
+
+function calcDefaultRightPosition() {
+  const cardWidth = 440
+  const rightMargin = 24
+  if (typeof window !== 'undefined') {
+    return {
+      x: Math.max(20, window.innerWidth - cardWidth - rightMargin),
+      y: 80
+    }
+  }
+  return { x: 900, y: 80 }
+}
+
+const isDragging = ref(false)
+const position = ref(calcDefaultRightPosition())
+const dragOffset = ref({ x: 0, y: 0 })
+
 function handleResize() {
   isMobile.value = window.innerWidth < 768
+  if (!isMobile.value && !hasUserDragged.value) {
+    position.value = calcDefaultRightPosition()
+  }
 }
+
 onMounted(() => {
   handleResize()
+  if (!isMobile.value) {
+    position.value = calcDefaultRightPosition()
+  }
   window.addEventListener('resize', handleResize)
 })
+
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
 })
 
-const isDragging = ref(false)
-const position = ref({ x: 20, y: 80 })
-const dragOffset = ref({ x: 0, y: 0 })
+watch(() => props.adcode, () => {
+  if (!isMobile.value && !hasUserDragged.value) {
+    position.value = calcDefaultRightPosition()
+  }
+})
 
 function onPointerDown(e: PointerEvent) {
   if (isMobile.value) return
@@ -106,6 +134,7 @@ function onPointerDown(e: PointerEvent) {
   if (target.closest('button') || target.closest('.popup-body')) return
   
   isDragging.value = true
+  hasUserDragged.value = true
   dragOffset.value = {
     x: e.clientX - position.value.x,
     y: e.clientY - position.value.y
