@@ -75,10 +75,12 @@ onMounted(async () => {
       const adcode = extractAdcode(f)
       const parentCode = String(f.properties?.parent?.adcode || '')
       const parentProvince = parentCode ? provinceNameMap.get(parentCode) : ''
+      const isDirectAdmin = ['110000', '120000', '310000', '500000', '810000', '820000', '710000'].includes(adcode)
+      const isSelfParent = isDirectAdmin || !parentProvince || parentProvince === name || name.startsWith(parentProvince)
       if (name && adcode) {
         items.push({
           adcode,
-          name: parentProvince ? `${name} (${parentProvince})` : name,
+          name: isSelfParent ? name : `${name} (${parentProvince})`,
           nameEn,
           level: 'city',
           searchText: `${name} ${nameEn} ${parentProvince}`.toLowerCase()

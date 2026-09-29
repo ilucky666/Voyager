@@ -25,7 +25,14 @@ export const useTravelStore = defineStore('travel', () => {
       }
 
       provinceSet.add(p.adcode.includes('-') ? p.adcode : p.adcode.substring(0, 2))
-      if (p.adcode.length >= 4 && !p.adcode.includes('-')) citySet.add(p.adcode.substring(0, 4))
+      if (p.adcode.length >= 4 && !p.adcode.includes('-')) {
+        const prov = p.adcode.substring(0, 2)
+        if (['11', '12', '31', '50', '81', '82', '71'].includes(prov)) {
+          citySet.add(prov + '00')
+        } else {
+          citySet.add(p.adcode.substring(0, 4))
+        }
+      }
       countyCount++
     })
     return { country: countrySet.size, province: provinceSet.size, city: citySet.size, county: countyCount }
@@ -46,7 +53,14 @@ export const useTravelStore = defineStore('travel', () => {
       }
 
       provinceSet.add(p.adcode.includes('-') ? p.adcode : p.adcode.substring(0, 2))
-      if (p.adcode.length >= 4 && !p.adcode.includes('-')) citySet.add(p.adcode.substring(0, 4))
+      if (p.adcode.length >= 4 && !p.adcode.includes('-')) {
+        const prov = p.adcode.substring(0, 2)
+        if (['11', '12', '31', '50', '81', '82', '71'].includes(prov)) {
+          citySet.add(prov + '00')
+        } else {
+          citySet.add(p.adcode.substring(0, 4))
+        }
+      }
       countyCount++
     })
     return { country: countrySet.size, province: provinceSet.size, city: citySet.size, county: countyCount }
@@ -107,7 +121,9 @@ export const useTravelStore = defineStore('travel', () => {
     if (featureLevel === 'city') {
       let hasVisited = false
       let hasWishlist = false
-      const prefix = featureAdcode.substring(0, 4)
+      const prov = featureAdcode.substring(0, 2)
+      const isDirectAdmin = ['11', '12', '31', '50', '81', '82', '71'].includes(prov) && (featureAdcode.endsWith('0000') || featureAdcode.endsWith('00'))
+      const prefix = isDirectAdmin ? prov : featureAdcode.substring(0, 4)
       for (const place of places.value) {
         if (place.adcode === featureAdcode || (!place.adcode.includes('-') && place.adcode.startsWith(prefix))) {
           if (place.type === 'visited') hasVisited = true
