@@ -7,7 +7,8 @@ export function buildHierarchy(placesList: TravelPlace[]): CountryGroup[] {
   for (const place of placesList) {
     const countryCode = place.countryCode || (place.level === 'country' ? place.adcode : (place.country || 'CN'))
     const provPrefix = place.adcode.includes('-') ? place.adcode : place.adcode.substring(0, 2)
-    const cityPrefix = place.adcode.length >= 4 && !place.adcode.includes('-') ? place.adcode.substring(0, 4) : provPrefix + '00'
+    const isProvDirectCounty = !place.adcode.includes('-') && place.adcode.length >= 4 && place.adcode.substring(2, 4) === '90'
+    const cityPrefix = isProvDirectCounty ? place.adcode : (place.adcode.length >= 4 && !place.adcode.includes('-') ? place.adcode.substring(0, 4) : provPrefix + '00')
 
     if (!countryMap.has(countryCode)) {
       countryMap.set(countryCode, new Map())

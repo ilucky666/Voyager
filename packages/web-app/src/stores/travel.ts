@@ -29,6 +29,8 @@ export const useTravelStore = defineStore('travel', () => {
         const prov = p.adcode.substring(0, 2)
         if (['11', '12', '31', '50', '81', '82', '71'].includes(prov)) {
           citySet.add(prov + '00')
+        } else if (p.adcode.length >= 4 && p.adcode.substring(2, 4) === '90') {
+          citySet.add(p.adcode)
         } else {
           citySet.add(p.adcode.substring(0, 4))
         }
@@ -57,6 +59,8 @@ export const useTravelStore = defineStore('travel', () => {
         const prov = p.adcode.substring(0, 2)
         if (['11', '12', '31', '50', '81', '82', '71'].includes(prov)) {
           citySet.add(prov + '00')
+        } else if (p.adcode.length >= 4 && p.adcode.substring(2, 4) === '90') {
+          citySet.add(p.adcode)
         } else {
           citySet.add(p.adcode.substring(0, 4))
         }
@@ -128,7 +132,8 @@ export const useTravelStore = defineStore('travel', () => {
       let hasWishlist = false
       const prov = fCode.substring(0, 2)
       const isDirectAdmin = ['11', '12', '31', '50', '81', '82', '71'].includes(prov)
-      const prefix = isDirectAdmin ? prov : fCode.substring(0, 4)
+      const isProvDirectCounty = fCode.length >= 4 && fCode.substring(2, 4) === '90'
+      const prefix = isDirectAdmin ? prov : (isProvDirectCounty ? fCode : fCode.substring(0, 4))
       for (const place of places.value) {
         const pCode = String(place.adcode || '')
         if (pCode === fCode || (!pCode.includes('-') && pCode.startsWith(prefix))) {
@@ -214,6 +219,14 @@ export const useTravelStore = defineStore('travel', () => {
       if (!existing) {
         await db.places.put(place)
         count++
+      } else {
+        const hasNewNote = Boolean(place.note && place.note !== existing.note)
+        const hasNewDate = Boolean(place.visitDate && place.visitDate !== existing.visitDate)
+        const isNewer = Boolean(place.updatedAt && existing.updatedAt && new Date(place.updatedAt) > new Date(existing.updatedAt))
+        if (hasNewNote || hasNewDate || isNewer) {
+          await db.places.put({ ...existing, ...place, id: existing.id })
+          count++
+        }
       }
     }
     if (data.routes && Array.isArray(data.routes)) {

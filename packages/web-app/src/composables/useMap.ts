@@ -290,6 +290,12 @@ export function useMap(containerId: string) {
     switchStyle()
   })
 
+  watch(() => travelStore.places.length, () => {
+    if (map && mapReady.value) {
+      loadAdminLayer()
+    }
+  })
+
   onMounted(() => {
     initMap()
   })

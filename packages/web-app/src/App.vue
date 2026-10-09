@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useTravelStore } from './stores/travel'
 import { checkURLImport, importFromJSON, clearURLImport } from './composables/useSync'
+import { downloadFromWebDAV } from './composables/useWebDAV'
 import { Map, Footprints, Plane, Settings } from 'lucide-vue-next'
 import { useRoute, useRouter } from 'vue-router'
 import MapView from './components/views/MapView.vue'
@@ -26,6 +27,49 @@ onMounted(async () => {
       setTimeout(() => { syncMessage.value = '' }, 4000)
     }
     clearURLImport()
+    return
+  }
+
+  // Auto-recovery if local database is empty
+  if (travelStore.places.length === 0) {
+    const webdavUrl = localStorage.getItem('webdav_url')
+    if (webdavUrl) {
+      try {
+        const res = await downloadFromWebDAV({
+          url: webdavUrl,
+          user: localStorage.getItem('webdav_user') || '',
+          pass: localStorage.getItem('webdav_pass') || '',
+          path: localStorage.getItem('webdav_path') || '/voyager-sync.json'
+        })
+        if (res && res.data) {
+          const count = await travelStore.importData(res.data)
+          if (count > 0) {
+            syncMessage.value = `已自动从云端恢复 ${count} 个足迹地点`
+            setTimeout(() => { syncMessage.value = '' }, 4000)
+            return
+          }
+        }
+      } catch (e) {
+        console.warn('[App] Auto WebDAV sync failed:', e)
+      }
+    }
+
+    // Fallback: If not manually cleared before and local DB is empty, auto-seed preset backup
+    if (!localStorage.getItem('voyager_cleared_by_user')) {
+      try {
+        const resp = await fetch('/voyager-sync.json')
+        if (resp.ok) {
+          const text = await resp.text()
+          const count = await travelStore.importData(text)
+          if (count > 0) {
+            syncMessage.value = `已载入历史标记数据 (${count} 个地点)`
+            setTimeout(() => { syncMessage.value = '' }, 4000)
+          }
+        }
+      } catch (e) {
+        console.warn('[App] Auto preset seed failed:', e)
+      }
+    }
   }
 })
 

@@ -97,25 +97,59 @@ async function handleWebdavTest() {
 
 async function handleWebdavSyncToCloud() {
   try {
+    // 1. Safe two-way merge: pull cloud data first if available to avoid overwriting newer data
+    try {
+      const cloudRes = await downloadFromWebDAV(webdavConfig.value)
+      if (cloudRes && cloudRes.data) {
+        await travelStore.importData(cloudRes.data)
+      }
+    } catch (pullErr) {
+      console.warn('[WebDAV] Pre-sync pull skipped or failed:', pullErr)
+    }
+
+    // 2. Export the merged comprehensive dataset
     const json = await exportToJSON()
-    await uploadToWebDAV(webdavConfig.value, json)
+    const savedPath = await uploadToWebDAV(webdavConfig.value, json)
+    if (savedPath && savedPath !== webdavConfig.value.path) {
+      webdavConfig.value.path = savedPath
+      localStorage.setItem('webdav_path', savedPath)
+    }
     showMessage('已同步至 WebDAV 云端', 'success')
   } catch (e: any) {
-    showMessage('云端同步失败: ' + e.message, 'error')
+    showMessage('云端同步失败: ' + (e.message || String(e)), 'error')
   }
 }
 
 async function handleWebdavSyncFromCloud() {
   try {
-    const data = await downloadFromWebDAV(webdavConfig.value)
-    if (data) {
-      const count = await travelStore.importData(data)
+    const result = await downloadFromWebDAV(webdavConfig.value)
+    if (result && result.data) {
+      const count = await travelStore.importData(result.data)
+      if (result.foundPath && result.foundPath !== webdavConfig.value.path) {
+        webdavConfig.value.path = result.foundPath
+        localStorage.setItem('webdav_path', result.foundPath)
+      }
       showMessage(`从云端导入成功，新增 ${count} 项`, 'success')
     } else {
       showMessage('云端无数据', 'success')
     }
   } catch (e: any) {
-    showMessage('从云端导入失败: ' + e.message, 'error')
+    showMessage('从云端导入失败: ' + (e.message || String(e)), 'error')
+  }
+}
+
+async function handleRestorePresetBackup() {
+  try {
+    const resp = await fetch('/voyager-sync.json')
+    if (!resp.ok) {
+      throw new Error(`加载预置文件失败 (HTTP ${resp.status})`)
+    }
+    const text = await resp.text()
+    const count = await travelStore.importData(text)
+    localStorage.removeItem('voyager_cleared_by_user')
+    showMessage(`已恢复预置历史备份：共导入/更新 ${count} 项`, 'success')
+  } catch (e: any) {
+    showMessage('恢复备份失败: ' + (e.message || String(e)), 'error')
   }
 }
 
@@ -131,6 +165,7 @@ async function copySyncLink() {
 async function handleClear() {
   if (!confirm('确定要清空所有数据吗？此操作不可撤销！')) return
   await travelStore.clearAll()
+  localStorage.setItem('voyager_cleared_by_user', 'true')
   showMessage('已清空所有数据', 'success')
 }
 
@@ -233,7 +268,7 @@ function showMessage(msg: string, type: 'success' | 'error') {
             <input type="text" v-model="webdavConfig.url" placeholder="服务器地址 (如 https://dav.jianguoyun.com/dav/)" />
             <input type="text" v-model="webdavConfig.user" placeholder="用户名/账号" />
             <input type="password" v-model="webdavConfig.pass" placeholder="应用密码/授权码" />
-            <input type="text" v-model="webdavConfig.path" placeholder="同步路径 (默认 /voyager.json)" />
+            <input type="text" v-model="webdavConfig.path" placeholder="同步路径 (默认 /voyager-sync.json，坚果云推荐 /我的坚果云/voyager-sync.json)" />
             <button class="btn btn-primary self-end mt-1 text-sm" :disabled="webdavTesting" @click="handleWebdavTest">
               {{ webdavTesting ? '连接中...' : '测试并保存' }}
             </button>
@@ -288,6 +323,15 @@ function showMessage(msg: string, type: 'success' | 'error') {
       <section class="mb-6">
         <h2 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 pl-1">高级</h2>
         <div class="bg-gray-100 dark:bg-[#2c2c2e] rounded-2xl overflow-hidden flex flex-col">
+          <div class="flex justify-between items-center px-4 py-3.5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-gray-200 dark:border-gray-700/50" @click="handleRestorePresetBackup">
+            <div class="flex items-center gap-3">
+              <Database class="w-5 h-5 text-indigo-500" />
+              <div class="flex flex-col">
+                <span class="text-[15px] font-medium">恢复内置备份数据</span>
+                <span class="text-[11px] text-gray-500">一键恢复仓库中预置的 212 个历史足迹与游记</span>
+              </div>
+            </div>
+          </div>
           <div class="flex justify-between items-center px-4 py-3.5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-gray-200 dark:border-gray-700/50" @click="handleExportFile">
             <div class="flex items-center gap-3">
               <span class="text-[15px] font-medium">导出 JSON 文件</span>
