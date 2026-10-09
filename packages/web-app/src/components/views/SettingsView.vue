@@ -2,11 +2,11 @@
 import { ref } from 'vue'
 import { useMapStore } from '@/stores/map'
 import { useTravelStore } from '@/stores/travel'
-import { shareFootprint } from '@/composables/useExport'
+import { generateFootprintImage, downloadFootprintImage, copyFootprintImage, shareFootprint } from '@/composables/useExport'
 import { exportToFile, importFromFile, exportToClipboard, importFromClipboard, exportToJSON, generateCompressedSyncURL } from '@/composables/useSync'
 import { testWebDAVConnection, uploadToWebDAV, downloadFromWebDAV, type WebDAVConfig } from '@/composables/useWebDAV'
 import QrcodeVue from 'qrcode.vue'
-import { SunMoon, Cloud, CloudDownload, CloudUpload, Link, Settings, Database, Share, Image as ImageIcon, MapPin, Map, Star, Smartphone, RefreshCw, Trash2, Globe } from 'lucide-vue-next'
+import { SunMoon, Cloud, CloudDownload, CloudUpload, Link, Settings, Database, Share, Image as ImageIcon, MapPin, Map, Star, Smartphone, RefreshCw, Trash2, Globe, Download, Copy, X } from 'lucide-vue-next'
 
 const mapStore = useMapStore()
 const travelStore = useTravelStore()
@@ -169,12 +169,55 @@ async function handleClear() {
   showMessage('已清空所有数据', 'success')
 }
 
-async function handleShareFootprint() {
+const showFootprintModal = ref(false)
+const footprintPreviewUrl = ref('')
+const footprintBlob = ref<Blob | null>(null)
+const generatingFootprint = ref(false)
+
+async function handleGenerateFootprint() {
+  if (generatingFootprint.value) return
+  generatingFootprint.value = true
   try {
-    await shareFootprint()
-    showMessage('足迹图已生成', 'success')
+    const blob = await generateFootprintImage()
+    footprintBlob.value = blob
+    if (footprintPreviewUrl.value) {
+      URL.revokeObjectURL(footprintPreviewUrl.value)
+    }
+    footprintPreviewUrl.value = URL.createObjectURL(blob)
+    showFootprintModal.value = true
   } catch (e: any) {
-    showMessage('生成失败: ' + e.message, 'error')
+    showMessage('生成失败: ' + (e.message || String(e)), 'error')
+  } finally {
+    generatingFootprint.value = false
+  }
+}
+
+async function handleDownloadFootprint() {
+  if (!footprintBlob.value) return
+  try {
+    await downloadFootprintImage(footprintBlob.value)
+    showMessage('足迹海报已保存', 'success')
+  } catch (e: any) {
+    showMessage('下载失败: ' + (e.message || String(e)), 'error')
+  }
+}
+
+async function handleCopyFootprint() {
+  if (!footprintBlob.value) return
+  try {
+    await copyFootprintImage(footprintBlob.value)
+    showMessage('海报已复制到剪贴板', 'success')
+  } catch (e: any) {
+    showMessage(e.message || '复制失败', 'error')
+  }
+}
+
+async function handleShareFootprint() {
+  if (!footprintBlob.value) return
+  try {
+    await shareFootprint(footprintBlob.value)
+  } catch (e: any) {
+    showMessage('分享失败: ' + (e.message || String(e)), 'error')
   }
 }
 
@@ -244,14 +287,16 @@ function showMessage(msg: string, type: 'success' | 'error') {
       <section class="mb-6">
         <h2 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 pl-1">云端与分享</h2>
         <div class="bg-gray-100 dark:bg-[#2c2c2e] rounded-2xl overflow-hidden flex flex-col">
-          <div class="flex justify-between items-center px-4 py-3.5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-gray-200 dark:border-gray-700/50" @click="handleShareFootprint">
+          <div class="flex justify-between items-center px-4 py-3.5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-gray-200 dark:border-gray-700/50" @click="handleGenerateFootprint">
             <div class="flex items-center gap-3">
               <ImageIcon class="w-5 h-5 text-purple-500" />
               <div class="flex flex-col">
                 <span class="text-[15px] font-medium">生成足迹图</span>
-                <span class="text-[11px] text-gray-500">生成高清图片并保存分享</span>
+                <span class="text-[11px] text-gray-500">高清市级矢量地图与数据专属海报</span>
               </div>
             </div>
+            <div v-if="generatingFootprint" class="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
+            <Share v-else class="w-4 h-4 text-gray-400" />
           </div>
 
           <div class="flex justify-between items-center px-4 py-3.5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-gray-200 dark:border-gray-700/50" @click="showWebdavSettings = !showWebdavSettings">
@@ -373,6 +418,49 @@ function showMessage(msg: string, type: 'success' | 'error') {
           </div>
           
           <button class="btn btn-ghost w-full" @click="showQrModal = false">完成</button>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- Footprint Poster Preview Modal -->
+    <Transition name="fade">
+      <div v-if="showFootprintModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-5" @click.self="showFootprintModal = false">
+        <div class="bg-white dark:bg-[#181d28] rounded-[1.75rem] max-w-lg w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden border border-gray-200 dark:border-white/10">
+          <!-- Modal Header -->
+          <div class="px-5 py-4 border-b border-gray-100 dark:border-white/10 flex items-center justify-between flex-shrink-0">
+            <div class="flex items-center gap-2.5">
+              <div class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
+              <h3 class="text-base font-bold text-gray-900 dark:text-white">专属旅行足迹海报</h3>
+            </div>
+            <button class="p-1.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors text-gray-400 hover:text-gray-600 dark:hover:text-white" @click="showFootprintModal = false">
+              <X class="w-5 h-5" />
+            </button>
+          </div>
+
+          <!-- Poster Image Display -->
+          <div class="flex-1 overflow-y-auto p-4 flex flex-col items-center justify-center bg-gray-50/70 dark:bg-black/30 iOS-scroll">
+            <div class="relative max-w-full rounded-2xl overflow-hidden shadow-2xl border border-black/10 dark:border-white/10">
+              <img :src="footprintPreviewUrl" alt="旅行足迹海报" class="w-auto max-h-[58vh] object-contain rounded-2xl block" />
+            </div>
+            <p class="text-[11px] text-gray-400 dark:text-gray-400 mt-3 text-center">
+              长按图片可直接保存到相册或发送给微信好友
+            </p>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="p-4 border-t border-gray-100 dark:border-white/10 bg-white dark:bg-[#181d28] flex gap-2.5 flex-shrink-0">
+            <button class="btn btn-primary flex-1 !py-2.5 !text-xs font-semibold flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20" @click="handleDownloadFootprint">
+              <Download class="w-4 h-4" />
+              保存到相册
+            </button>
+            <button class="btn btn-ghost flex-1 !py-2.5 !text-xs font-medium border border-gray-200 dark:border-white/10 flex items-center justify-center gap-1.5" @click="handleCopyFootprint">
+              <Copy class="w-4 h-4" />
+              复制图片
+            </button>
+            <button class="btn btn-ghost !px-3 !py-2.5 !text-xs font-medium border border-gray-200 dark:border-white/10 flex items-center justify-center" title="系统分享" @click="handleShareFootprint">
+              <Share class="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
     </Transition>
