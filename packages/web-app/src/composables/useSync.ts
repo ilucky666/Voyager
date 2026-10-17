@@ -15,11 +15,19 @@ export async function importFromJSON(json: string): Promise<{ places: number; ro
 
   if (data.places && Array.isArray(data.places)) {
     const existing = await db.places.toArray()
-    const existingIds = new Set(existing.map(p => p.id))
     for (const place of data.places) {
-      if (!existingIds.has(place.id)) {
+      const match = existing.find(p => p.id === place.id || (p.adcode === place.adcode && p.type === place.type))
+      if (!match) {
         await db.places.put(place)
         placeCount++
+      } else {
+        const hasNewNote = Boolean(place.note && place.note !== match.note)
+        const hasNewDate = Boolean(place.visitDate && place.visitDate !== match.visitDate)
+        const isNewer = Boolean(place.updatedAt && match.updatedAt && new Date(place.updatedAt) > new Date(match.updatedAt))
+        if (hasNewNote || hasNewDate || isNewer) {
+          await db.places.put({ ...match, ...place, id: match.id })
+          placeCount++
+        }
       }
     }
   }
@@ -31,6 +39,8 @@ export async function importFromJSON(json: string): Promise<{ places: number; ro
       if (!existingIds.has(route.id)) {
         await db.routes.put(route)
         routeCount++
+      } else {
+        await db.routes.put(route)
       }
     }
   }

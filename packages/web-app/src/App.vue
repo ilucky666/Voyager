@@ -30,45 +30,52 @@ onMounted(async () => {
     return
   }
 
-  // Auto-recovery if local database is empty
-  if (travelStore.places.length === 0) {
-    const webdavUrl = localStorage.getItem('webdav_url')
-    if (webdavUrl) {
-      try {
-        const res = await downloadFromWebDAV({
-          url: webdavUrl,
-          user: localStorage.getItem('webdav_user') || '',
-          pass: localStorage.getItem('webdav_pass') || '',
-          path: localStorage.getItem('webdav_path') || '/voyager-sync.json'
-        })
-        if (res && res.data) {
-          const count = await travelStore.importData(res.data)
-          if (count > 0) {
-            syncMessage.value = `已自动从云端恢复 ${count} 个足迹地点`
-            setTimeout(() => { syncMessage.value = '' }, 4000)
-            return
-          }
-        }
-      } catch (e) {
-        console.warn('[App] Auto WebDAV sync failed:', e)
-      }
+  // Pull from WebDAV cloud if configured
+  const webdavUrl = localStorage.getItem('webdav_url')
+  if (webdavUrl) {
+    const isJianguo = webdavUrl.includes('jianguoyun')
+    let savedPath = localStorage.getItem('webdav_path') || ''
+    if (isJianguo && (!savedPath || savedPath === '/voyager-sync.json')) {
+      savedPath = '/我的坚果云/voyager-sync.json'
+      localStorage.setItem('webdav_path', savedPath)
     }
 
-    // Fallback: If not manually cleared before and local DB is empty, auto-seed preset backup
-    if (!localStorage.getItem('voyager_cleared_by_user')) {
-      try {
-        const resp = await fetch('/voyager-sync.json')
-        if (resp.ok) {
-          const text = await resp.text()
-          const count = await travelStore.importData(text)
-          if (count > 0) {
-            syncMessage.value = `已载入历史标记数据 (${count} 个地点)`
-            setTimeout(() => { syncMessage.value = '' }, 4000)
-          }
+    try {
+      const res = await downloadFromWebDAV({
+        url: webdavUrl,
+        user: localStorage.getItem('webdav_user') || '',
+        pass: localStorage.getItem('webdav_pass') || '',
+        path: savedPath || (isJianguo ? '/我的坚果云/voyager-sync.json' : '/voyager-sync.json')
+      })
+      if (res && res.data) {
+        if (res.foundPath && res.foundPath !== savedPath) {
+          localStorage.setItem('webdav_path', res.foundPath)
         }
-      } catch (e) {
-        console.warn('[App] Auto preset seed failed:', e)
+        const count = await travelStore.importData(res.data)
+        if (count > 0) {
+          syncMessage.value = `已从云端同步 ${count} 项最新足迹`
+          setTimeout(() => { syncMessage.value = '' }, 4000)
+        }
       }
+    } catch (e) {
+      console.warn('[App] Auto WebDAV sync failed:', e)
+    }
+  }
+
+  // Fallback: If not manually cleared before and local DB is STILL empty after WebDAV check
+  if (travelStore.places.length === 0 && !localStorage.getItem('voyager_cleared_by_user')) {
+    try {
+      const resp = await fetch('/voyager-sync.json')
+      if (resp.ok) {
+        const text = await resp.text()
+        const count = await travelStore.importData(text)
+        if (count > 0) {
+          syncMessage.value = `已载入历史标记数据 (${count} 个地点)`
+          setTimeout(() => { syncMessage.value = '' }, 4000)
+        }
+      }
+    } catch (e) {
+      console.warn('[App] Auto preset seed failed:', e)
     }
   }
 })

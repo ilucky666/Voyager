@@ -17,11 +17,19 @@ const syncLink = ref('')
 const qrCodeUrl = ref('')
 const showQrModal = ref(false)
 
+const savedWebdavUrl = localStorage.getItem('webdav_url') || ''
+const isJianguo = savedWebdavUrl.includes('jianguoyun')
+let savedWebdavPath = localStorage.getItem('webdav_path') || ''
+if (isJianguo && (!savedWebdavPath || savedWebdavPath === '/voyager-sync.json')) {
+  savedWebdavPath = '/我的坚果云/voyager-sync.json'
+  localStorage.setItem('webdav_path', savedWebdavPath)
+}
+
 const webdavConfig = ref<WebDAVConfig>({
-  url: localStorage.getItem('webdav_url') || '',
+  url: savedWebdavUrl,
   user: localStorage.getItem('webdav_user') || '',
   pass: localStorage.getItem('webdav_pass') || '',
-  path: localStorage.getItem('webdav_path') || '/voyager-sync.json'
+  path: savedWebdavPath || (isJianguo ? '/我的坚果云/voyager-sync.json' : '/voyager-sync.json')
 })
 const webdavTesting = ref(false)
 const showWebdavSettings = ref(false)
@@ -78,6 +86,10 @@ async function handleGenSyncLink() {
 async function handleWebdavTest() {
   webdavTesting.value = true
   try {
+    const isJianguo = webdavConfig.value.url.includes('jianguoyun')
+    if (isJianguo && (!webdavConfig.value.path || webdavConfig.value.path === '/voyager-sync.json')) {
+      webdavConfig.value.path = '/我的坚果云/voyager-sync.json'
+    }
     const errorMsg = await testWebDAVConnection(webdavConfig.value)
     webdavTesting.value = false
     if (errorMsg === true) {
@@ -97,24 +109,46 @@ async function handleWebdavTest() {
 
 async function handleWebdavSyncToCloud() {
   try {
-    // 1. Safe two-way merge: pull cloud data first if available to avoid overwriting newer data
+    let cloudPlacesCount = 0
+
+    // 1. Mandatory pull & merge before upload
     try {
       const cloudRes = await downloadFromWebDAV(webdavConfig.value)
       if (cloudRes && cloudRes.data) {
+        try {
+          const parsed = JSON.parse(cloudRes.data)
+          if (Array.isArray(parsed.places)) {
+            cloudPlacesCount = parsed.places.length
+          }
+        } catch (e) {
+          console.warn('[WebDAV] Could not parse cloud json:', e)
+        }
         await travelStore.importData(cloudRes.data)
+        if (cloudRes.foundPath && cloudRes.foundPath !== webdavConfig.value.path) {
+          webdavConfig.value.path = cloudRes.foundPath
+          localStorage.setItem('webdav_path', cloudRes.foundPath)
+        }
       }
-    } catch (pullErr) {
-      console.warn('[WebDAV] Pre-sync pull skipped or failed:', pullErr)
+    } catch (pullErr: any) {
+      console.error('[WebDAV] Pre-sync pull failed:', pullErr)
+      // Strict safety shield: Do not proceed to upload if pre-sync pull failed with error
+      throw new Error(`无法验证云端已有数据（${pullErr.message || pullErr}），为保护云端历史记录已中止上传`)
     }
 
-    // 2. Export the merged comprehensive dataset
+    // 2. Data Loss Prevention Shield
+    const localPlacesCount = travelStore.places.length
+    if (cloudPlacesCount > 0 && localPlacesCount < cloudPlacesCount) {
+      throw new Error(`本地合并后数据 (${localPlacesCount} 项) 少于云端已有数据 (${cloudPlacesCount} 项)，为防止覆盖最新版本已中止上传！请先点击【从云端拉取数据】`)
+    }
+
+    // 3. Export the comprehensive dataset
     const json = await exportToJSON()
     const savedPath = await uploadToWebDAV(webdavConfig.value, json)
     if (savedPath && savedPath !== webdavConfig.value.path) {
       webdavConfig.value.path = savedPath
       localStorage.setItem('webdav_path', savedPath)
     }
-    showMessage('已同步至 WebDAV 云端', 'success')
+    showMessage(`已安全同步至云端 (共 ${localPlacesCount} 个地点)`, 'success')
   } catch (e: any) {
     showMessage('云端同步失败: ' + (e.message || String(e)), 'error')
   }
@@ -129,9 +163,9 @@ async function handleWebdavSyncFromCloud() {
         webdavConfig.value.path = result.foundPath
         localStorage.setItem('webdav_path', result.foundPath)
       }
-      showMessage(`从云端导入成功，新增 ${count} 项`, 'success')
+      showMessage(`从云端拉取成功：新增/更新 ${count} 项 (当前共 ${travelStore.places.length} 个地点)`, 'success')
     } else {
-      showMessage('云端无数据', 'success')
+      showMessage('云端未找到备份文件，请检查 WebDAV 路径', 'error')
     }
   } catch (e: any) {
     showMessage('从云端导入失败: ' + (e.message || String(e)), 'error')
