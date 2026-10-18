@@ -73,6 +73,10 @@ export function useMap(containerId: string) {
       zoom: 3.5,
       minZoom: 2,
       maxZoom: 12,
+      pitch: 0,
+      maxPitch: 0,
+      dragRotate: false,
+      pitchWithRotate: false,
       attributionControl: false,
       trackResize: true,
     })

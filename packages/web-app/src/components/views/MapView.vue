@@ -109,7 +109,7 @@ watch(selectedFeature, (newFeature) => {
           left: isMobile ? 40 : 100,
           right: isMobile ? 40 : 460
         },
-        pitch: mapStore.currentLevel === 'country' ? 15 : 30,
+        pitch: 0,
         duration: 1300,
         maxZoom: 11,
       })
@@ -118,7 +118,7 @@ watch(selectedFeature, (newFeature) => {
       map()?.flyTo({
         center: center as [number, number],
         zoom: mapStore.currentLevel === 'country' ? 3.5 : (mapStore.currentLevel === 'province' ? 5.5 : 9),
-        pitch: 30,
+        pitch: 0,
         duration: 1300,
       })
     }
@@ -171,7 +171,7 @@ watch([() => route.query.adcode, mapReady], async ([newAdcode, isReady]) => {
               left: isMobile ? 40 : 100,
               right: isMobile ? 40 : 460
             },
-            pitch: mapStore.currentLevel === 'country' ? 15 : 30,
+            pitch: 0,
             duration: 1400,
             maxZoom: 11,
           })
@@ -239,13 +239,11 @@ async function toggleType() {
 
 function closePopup() {
   selectedFeature.value = null
-  // Reset pitch when closed
-  map()?.easeTo({ pitch: 0, duration: 1000 })
 }
 
 function handleSwitchLevel(level: AdminLevel) {
   switchLevel(level)
-  map()?.easeTo({ pitch: 0, zoom: 4, duration: 1000 })
+  map()?.easeTo({ zoom: 4, duration: 1000 })
 }
 </script>
 
