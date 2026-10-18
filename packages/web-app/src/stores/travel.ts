@@ -80,6 +80,51 @@ export const useTravelStore = defineStore('travel', () => {
     return place ? place.type : 'none'
   }
 
+  function getSubordinatePlaces(
+    featureAdcode: string,
+    featureLevel: AdminLevel
+  ): TravelPlace[] {
+    const fCode = String(featureAdcode || '')
+    if (!fCode) return []
+
+    // 1. Country subordinate places
+    if (featureLevel === 'country') {
+      return places.value.filter(place => {
+        const pCode = String(place.adcode || '')
+        if (pCode === fCode) return false
+        return place.countryCode === fCode || (fCode === 'CN' && !pCode.includes('-') && place.level !== 'country')
+      })
+    }
+
+    // 2. Province subordinate places (cities and counties in this province)
+    if (featureLevel === 'province') {
+      const prefix = fCode.substring(0, 2)
+      return places.value.filter(place => {
+        const pCode = String(place.adcode || '')
+        if (pCode === fCode) return false
+        if (pCode.includes('-')) return false
+        return pCode.startsWith(prefix) && (place.level === 'city' || place.level === 'county' || pCode.substring(2, 6) !== '0000')
+      })
+    }
+
+    // 3. City subordinate places (counties in this city)
+    if (featureLevel === 'city') {
+      const prov = fCode.substring(0, 2)
+      const isDirectAdmin = ['11', '12', '31', '50', '81', '82', '71'].includes(prov)
+      const isProvDirectCounty = fCode.length >= 4 && fCode.substring(2, 4) === '90'
+      const prefix = isDirectAdmin ? prov : (isProvDirectCounty ? fCode : fCode.substring(0, 4))
+      return places.value.filter(place => {
+        const pCode = String(place.adcode || '')
+        if (pCode === fCode) return false
+        if (pCode.includes('-')) return false
+        if (!pCode.startsWith(prefix)) return false
+        return place.level === 'county' || (pCode.length === 6 && !pCode.endsWith('00'))
+      })
+    }
+
+    return []
+  }
+
   function getAggregatedPlaceType(
     featureAdcode: string,
     featureLevel: AdminLevel
@@ -90,61 +135,11 @@ export const useTravelStore = defineStore('travel', () => {
     const directPlace = getPlaceByAdcode(fCode)
     if (directPlace) return directPlace.type
 
-    // 2. Country aggregation
-    if (featureLevel === 'country') {
-      let hasVisited = false
-      let hasWishlist = false
-      for (const place of places.value) {
-        const pCode = String(place.adcode || '')
-        const isMatch = place.countryCode === fCode || pCode === fCode || (fCode === 'CN' && !pCode.includes('-') && place.level !== 'country')
-        if (isMatch) {
-          if (place.type === 'visited') hasVisited = true
-          else if (place.type === 'wishlist') hasWishlist = true
-        }
-        if (hasVisited) break
-      }
-      if (hasVisited) return 'visited'
-      if (hasWishlist) return 'wishlist'
-      return 'none'
-    }
-
-    // 3. Province / City / County aggregation for sub-regions
-    if (featureLevel === 'province') {
-      let hasVisited = false
-      let hasWishlist = false
-      const prefix = fCode.substring(0, 2)
-      for (const place of places.value) {
-        const pCode = String(place.adcode || '')
-        if (pCode === fCode || (!pCode.includes('-') && pCode.startsWith(prefix))) {
-          if (place.type === 'visited') hasVisited = true
-          else if (place.type === 'wishlist') hasWishlist = true
-        }
-        if (hasVisited) break
-      }
-      if (hasVisited) return 'visited'
-      if (hasWishlist) return 'wishlist'
-      return 'none'
-    }
-
-    // 4. City aggregation for sub-regions (counties)
-    if (featureLevel === 'city') {
-      let hasVisited = false
-      let hasWishlist = false
-      const prov = fCode.substring(0, 2)
-      const isDirectAdmin = ['11', '12', '31', '50', '81', '82', '71'].includes(prov)
-      const isProvDirectCounty = fCode.length >= 4 && fCode.substring(2, 4) === '90'
-      const prefix = isDirectAdmin ? prov : (isProvDirectCounty ? fCode : fCode.substring(0, 4))
-      for (const place of places.value) {
-        const pCode = String(place.adcode || '')
-        if (pCode === fCode || (!pCode.includes('-') && pCode.startsWith(prefix))) {
-          if (place.type === 'visited') hasVisited = true
-          else if (place.type === 'wishlist') hasWishlist = true
-        }
-        if (hasVisited) break
-      }
-      if (hasVisited) return 'visited'
-      if (hasWishlist) return 'wishlist'
-      return 'none'
+    // 2. Subordinate aggregation
+    const subs = getSubordinatePlaces(fCode, featureLevel)
+    if (subs.length > 0) {
+      if (subs.some(p => p.type === 'visited')) return 'visited'
+      if (subs.some(p => p.type === 'wishlist')) return 'wishlist'
     }
 
     return getPlaceTypeByAdcode(fCode)
@@ -254,6 +249,7 @@ export const useTravelStore = defineStore('travel', () => {
     getPlaceByAdcode,
     getPlaceTypeByAdcode,
     getAggregatedPlaceType,
+    getSubordinatePlaces,
     loadPlaces,
     addPlace,
     updatePlace,

@@ -29,9 +29,28 @@ const emit = defineEmits<{
   remove: []
   toggleType: []
   close: []
+  switchLevel: [level: AdminLevel]
+  inspectPlace: [place: TravelPlace]
 }>()
 
 const travelStore = useTravelStore()
+
+const aggregatedType = computed(() => {
+  return travelStore.getAggregatedPlaceType(props.adcode, props.currentLevel)
+})
+
+const subordinatePlaces = computed(() => {
+  return travelStore.getSubordinatePlaces(props.adcode, props.currentLevel)
+})
+
+const isInherited = computed(() => {
+  return !props.existingPlace && aggregatedType.value !== 'none'
+})
+
+const effectiveType = computed<'visited' | 'wishlist' | 'none'>(() => {
+  if (props.existingPlace) return props.existingPlace.type
+  return aggregatedType.value
+})
 
 const levelLabels: Record<AdminLevel, string> = {
   country: '国家/地区',
@@ -322,12 +341,45 @@ const cardStyle = computed<CSSProperties>(() => {
         </div>
 
         <!-- Visited / Wishlist Status Badge -->
-        <div v-if="existingPlace" class="mb-3">
-          <span :class="['inline-flex items-center gap-1.5 px-3 py-1 text-xs font-black rounded-full border', existingPlace.type === 'visited' ? 'bg-green-100 dark:bg-green-950 text-green-900 dark:text-green-100 border-green-400 dark:border-green-700' : 'bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-100 border-amber-400 dark:border-amber-700']">
-            <Check v-if="existingPlace.type === 'visited'" class="w-3.5 h-3.5" />
+        <div v-if="effectiveType !== 'none'" class="mb-3 flex items-center gap-2 flex-wrap">
+          <span :class="['inline-flex items-center gap-1.5 px-3 py-1 text-xs font-black rounded-full border shadow-2xs', effectiveType === 'visited' ? 'bg-green-100 dark:bg-green-950 text-green-900 dark:text-green-100 border-green-400 dark:border-green-700' : 'bg-amber-100 dark:bg-amber-950 text-amber-900 dark:text-amber-100 border-amber-400 dark:border-amber-700']">
+            <Check v-if="effectiveType === 'visited'" class="w-3.5 h-3.5" />
             <Star v-else class="w-3.5 h-3.5" />
-            {{ existingPlace.type === 'visited' ? '已标记去过' : '已标记想去' }}
+            <span v-if="existingPlace">
+              {{ existingPlace.type === 'visited' ? '已标记去过' : '已标记想去' }}
+            </span>
+            <span v-else>
+              {{ effectiveType === 'visited' ? '已去过' : '已想去' }}
+            </span>
           </span>
+
+          <span v-if="isInherited" class="px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/70 rounded-md border border-emerald-300 dark:border-emerald-800">
+            继承自下辖已标记
+          </span>
+        </div>
+
+        <!-- Subordinate Marked Places List (if any subordinate places exist) -->
+        <div v-if="subordinatePlaces.length > 0" class="p-3 bg-slate-50 dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-xl mb-3 shadow-2xs">
+          <div class="flex items-center justify-between text-xs font-black text-slate-800 dark:text-slate-200 mb-2">
+            <span class="flex items-center gap-1.5">
+              <Compass class="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+              <span>下辖已标记地点 ({{ subordinatePlaces.length }})</span>
+            </span>
+            <span v-if="isInherited" class="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">已自动点亮</span>
+          </div>
+          <div class="flex flex-wrap gap-1.5">
+            <button
+              v-for="sub in subordinatePlaces"
+              :key="sub.id"
+              type="button"
+              class="px-2.5 py-1 bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950 text-xs font-bold text-slate-800 dark:text-slate-100 border border-slate-300 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-400 rounded-lg shadow-2xs flex items-center gap-1 transition-all cursor-pointer"
+              @click="emit('inspectPlace', sub)"
+              :title="`在地图上查看 ${sub.name}`"
+            >
+              <span class="text-[10px]">{{ sub.type === 'visited' ? '🟢' : '⭐' }}</span>
+              <span>{{ sub.name }}</span>
+            </button>
+          </div>
         </div>
 
         <!-- Existing Place Details / Edit Mode -->
@@ -376,8 +428,8 @@ const cardStyle = computed<CSSProperties>(() => {
         </template>
       </div>
 
-      <!-- Action Buttons for New Mark -->
-      <div class="popup-actions flex gap-2 pt-2 border-t border-slate-200 dark:border-slate-800" v-if="!existingPlace">
+      <!-- Action Buttons for New Mark (Only when totally unmarked and not inherited) -->
+      <div class="popup-actions flex gap-2 pt-2 border-t border-slate-200 dark:border-slate-800" v-if="!existingPlace && !isInherited">
         <button class="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-black transition-all shadow-md flex items-center justify-center gap-1.5" @click="emit('addVisited')">
           <Check class="w-4 h-4" />
           标记为已去
@@ -385,6 +437,34 @@ const cardStyle = computed<CSSProperties>(() => {
         <button class="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black transition-all shadow-md flex items-center justify-center gap-1.5" @click="emit('addWishlist')">
           <Star class="w-4 h-4" />
           标记为想去
+        </button>
+      </div>
+
+      <!-- Action Buttons for Inherited Places (No mark options needed, show drill-down button if applicable) -->
+      <div class="popup-actions flex gap-2 pt-2 border-t border-slate-200 dark:border-slate-800" v-else-if="isInherited">
+        <button
+          v-if="currentLevel === 'city'"
+          class="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black transition-all shadow-md flex items-center justify-center gap-1.5"
+          @click="emit('switchLevel', 'county')"
+        >
+          <Compass class="w-4 h-4" />
+          切换至区县级查看详细打卡
+        </button>
+        <button
+          v-else-if="currentLevel === 'province'"
+          class="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black transition-all shadow-md flex items-center justify-center gap-1.5"
+          @click="emit('switchLevel', 'city')"
+        >
+          <Compass class="w-4 h-4" />
+          切换至市级查看打卡分布
+        </button>
+        <button
+          v-else-if="currentLevel === 'country'"
+          class="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black transition-all shadow-md flex items-center justify-center gap-1.5"
+          @click="emit('switchLevel', 'province')"
+        >
+          <Compass class="w-4 h-4" />
+          切换至省级查看打卡分布
         </button>
       </div>
     </div>

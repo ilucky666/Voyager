@@ -8,7 +8,7 @@ import { loadPlaceDetails, getPlaceDetail, loadingDetails } from '@/composables/
 import LevelSwitcher from '../map/LevelSwitcher.vue'
 import PlacePopup from '../map/PlacePopup.vue'
 import StatsBar from '../map/StatsBar.vue'
-import type { AdminLevel } from '@/types'
+import type { AdminLevel, TravelPlace } from '@/types'
 import { useRoute } from 'vue-router'
 import { onMounted } from 'vue'
 
@@ -245,6 +245,27 @@ function handleSwitchLevel(level: AdminLevel) {
   switchLevel(level)
   map()?.easeTo({ zoom: 4, duration: 1000 })
 }
+
+async function handleDrillDownLevel(level: AdminLevel) {
+  selectedFeature.value = null
+  await switchLevel(level)
+}
+
+async function handleInspectSubPlace(sub: TravelPlace) {
+  const targetLevel: AdminLevel = sub.level || (sub.adcode.length === 6 && !sub.adcode.endsWith('00') ? 'county' : 'city')
+  if (mapStore.currentLevel !== targetLevel) {
+    await switchLevel(targetLevel)
+  }
+  try {
+    const geojson = await loadGeoJSON(targetLevel)
+    const feat = geojson.features.find(f => extractAdcode(f) === sub.adcode)
+    if (feat) {
+      selectedFeature.value = feat
+    }
+  } catch (err) {
+    console.error('Failed to inspect subordinate place:', err)
+  }
+}
 </script>
 
 <template>
@@ -283,6 +304,8 @@ function handleSwitchLevel(level: AdminLevel) {
       @remove="removePlace"
       @toggle-type="toggleType"
       @close="closePopup"
+      @switch-level="handleDrillDownLevel"
+      @inspect-place="handleInspectSubPlace"
     />
   </div>
 </template>
