@@ -62,8 +62,9 @@ onMounted(async () => {
     }
   }
 
-  // Fallback: If not manually cleared before and local DB is STILL empty after WebDAV check
-  if (travelStore.places.length === 0 && !localStorage.getItem('voyager_cleared_by_user')) {
+  // Fallback: ONLY IF WebDAV is NOT configured, not manually cleared, and local DB is empty
+  const hasWebDAV = Boolean(webdavUrl)
+  if (!hasWebDAV && travelStore.places.length === 0 && !localStorage.getItem('voyager_cleared_by_user')) {
     try {
       const resp = await fetch('/voyager-sync.json')
       if (resp.ok) {

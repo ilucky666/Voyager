@@ -148,7 +148,7 @@ async function handleWebdavSyncToCloud() {
       webdavConfig.value.path = savedPath
       localStorage.setItem('webdav_path', savedPath)
     }
-    showMessage(`已安全同步至云端 (共 ${localPlacesCount} 个地点)`, 'success')
+    showMessage(`已安全双向同步至云端 (共 ${localPlacesCount} 个地点)`, 'success')
   } catch (e: any) {
     showMessage('云端同步失败: ' + (e.message || String(e)), 'error')
   }
@@ -163,7 +163,7 @@ async function handleWebdavSyncFromCloud() {
         webdavConfig.value.path = result.foundPath
         localStorage.setItem('webdav_path', result.foundPath)
       }
-      showMessage(`从云端拉取成功：新增/更新 ${count} 项 (当前共 ${travelStore.places.length} 个地点)`, 'success')
+      showMessage(`从云端拉取成功：已合并 ${count} 项 (当前共 ${travelStore.places.length} 个地点)`, 'success')
     } else {
       showMessage('云端未找到备份文件，请检查 WebDAV 路径', 'error')
     }
@@ -356,14 +356,20 @@ function showMessage(msg: string, type: 'success' | 'error') {
           <template v-if="webdavConfig.url">
             <div class="flex justify-between items-center px-4 py-3.5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-gray-200 dark:border-gray-700/50" @click="handleWebdavSyncToCloud">
               <div class="flex items-center gap-3">
-                <CloudUpload class="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                <span class="text-[15px] font-medium">上传数据至云端</span>
+                <CloudUpload class="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                <div class="flex flex-col">
+                  <span class="text-[15px] font-medium">双向安全同步至云端</span>
+                  <span class="text-[11px] text-gray-500">自动拉取合并云端数据并备份，防历史覆盖</span>
+                </div>
               </div>
             </div>
             <div class="flex justify-between items-center px-4 py-3.5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors" @click="handleWebdavSyncFromCloud">
               <div class="flex items-center gap-3">
-                <CloudDownload class="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                <span class="text-[15px] font-medium">从云端拉取数据</span>
+                <CloudDownload class="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <div class="flex flex-col">
+                  <span class="text-[15px] font-medium">从云端拉取数据</span>
+                  <span class="text-[11px] text-gray-500">仅从云端获取最新备份并合并到本地</span>
+                </div>
               </div>
             </div>
           </template>

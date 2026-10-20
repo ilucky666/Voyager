@@ -26,7 +26,11 @@ export function getWebDAVClient(config: WebDAVConfig): WebDAVClient {
 
   return createClient(finalUrl, {
     username: config.user,
-    password: config.pass
+    password: config.pass,
+    headers: {
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+    }
   })
 }
 
@@ -102,13 +106,25 @@ export async function uploadToWebDAV(config: WebDAVConfig, data: string): Promis
   }
 
   try {
-    await client.putFileContents(targetPath, data, { overwrite: true })
+    await client.putFileContents(targetPath, data, {
+      overwrite: true,
+      headers: {
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+        'Pragma': 'no-cache',
+      }
+    })
     return targetPath
   } catch (err: any) {
     const status = err?.status || err?.response?.status
     if (status === 403 && !targetPath.includes('我的坚果云') && isJianguo) {
       const jiangguoPath = '/我的坚果云' + targetPath
-      await client.putFileContents(jiangguoPath, data, { overwrite: true })
+      await client.putFileContents(jiangguoPath, data, {
+        overwrite: true,
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+        }
+      })
       return jiangguoPath
     }
     throw err
@@ -152,11 +168,21 @@ export async function downloadFromWebDAV(config: WebDAVConfig): Promise<WebDAVDo
   const uniquePaths = Array.from(new Set(candidatePaths))
 
   let lastAuthError: Error | null = null
+  let lastNetworkError: Error | null = null
+  let all404 = true
 
   for (const path of uniquePaths) {
     try {
       // Direct GET without PROPFIND to bypass Netlify proxy 405 limitations
-      const content = await client.getFileContents(path, { format: 'text' })
+      // Pass cache-busting headers to prevent browser/CDN from serving stale cached JSON
+      const content = await client.getFileContents(path, {
+        format: 'text',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'X-Requested-At': Date.now().toString(),
+        }
+      })
       if (typeof content === 'string' && content.trim().length > 0) {
         return {
           data: content,
@@ -172,21 +198,28 @@ export async function downloadFromWebDAV(config: WebDAVConfig): Promise<WebDAVDo
       }
       if (status === 403) {
         // 403 on Jianguoyun root folder is expected because /dav/ root cannot hold files.
-        // DO NOT break! Continue to check /我的坚果云/ candidate paths!
-        lastAuthError = new Error(`WebDAV 访问被拒绝 (403)，已尝试其他兼容路径`)
+        // Continue to check /我的坚果云/ candidate paths!
+        lastAuthError = new Error(`WebDAV 访问被拒绝 (403)，请检查坚果云权限及路径`)
         continue
       }
       if (status === 404) {
         // Path does not exist, continue checking other candidate paths
         continue
       }
+      all404 = false
+      lastNetworkError = error
       console.warn(`[WebDAV] Error checking path ${path}:`, error)
     }
   }
 
-  // Only throw if 401 authentication failed
-  if (lastAuthError && lastAuthError.message.includes('401')) {
+  // Throw authentication error if credentials failed
+  if (lastAuthError) {
     throw lastAuthError
+  }
+
+  // If a non-404 network or server error occurred, throw so callers don't assume cloud is empty
+  if (lastNetworkError && !all404) {
+    throw new Error(`连接云端服务异常 (${lastNetworkError.message || lastNetworkError})，为保护数据已中止`)
   }
 
   return null

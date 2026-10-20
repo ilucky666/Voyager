@@ -209,17 +209,42 @@ export const useTravelStore = defineStore('travel', () => {
       throw new Error('无效的数据格式')
     }
     let count = 0
+    const localPlaces = await db.places.toArray()
+    const placeMap = new Map<string, TravelPlace>()
+    for (const p of localPlaces) {
+      placeMap.set(`${String(p.adcode)}_${p.type}`, p)
+    }
+
     for (const place of data.places) {
-      const existing = places.value.find(p => p.adcode === place.adcode && p.type === place.type)
+      if (!place || !place.adcode) continue
+      const targetAdcode = String(place.adcode)
+      const key = `${targetAdcode}_${place.type}`
+      const existing = placeMap.get(key)
+
       if (!existing) {
-        await db.places.put(place)
+        const record: TravelPlace = {
+          ...place,
+          adcode: targetAdcode,
+          id: place.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15) + Date.now().toString(36)),
+          createdAt: place.createdAt || new Date().toISOString(),
+          updatedAt: place.updatedAt || new Date().toISOString()
+        }
+        // Verify no ID collision with another adcode in Dexie
+        const idCollision = await db.places.get(record.id)
+        if (idCollision && (String(idCollision.adcode) !== targetAdcode || idCollision.type !== record.type)) {
+          record.id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15) + Date.now().toString(36)
+        }
+        await db.places.put(record)
+        placeMap.set(key, record)
         count++
       } else {
         const hasNewNote = Boolean(place.note && place.note !== existing.note)
         const hasNewDate = Boolean(place.visitDate && place.visitDate !== existing.visitDate)
-        const isNewer = Boolean(place.updatedAt && existing.updatedAt && new Date(place.updatedAt) > new Date(existing.updatedAt))
+        const isNewer = Boolean(place.updatedAt && (!existing.updatedAt || new Date(place.updatedAt) > new Date(existing.updatedAt)))
         if (hasNewNote || hasNewDate || isNewer) {
-          await db.places.put({ ...existing, ...place, id: existing.id })
+          const updatedRecord = { ...existing, ...place, id: existing.id }
+          await db.places.put(updatedRecord)
+          placeMap.set(key, updatedRecord)
           count++
         }
       }

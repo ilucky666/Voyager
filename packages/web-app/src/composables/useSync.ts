@@ -15,17 +15,40 @@ export async function importFromJSON(json: string): Promise<{ places: number; ro
 
   if (data.places && Array.isArray(data.places)) {
     const existing = await db.places.toArray()
+    const placeMap = new Map<string, TravelPlace>()
+    for (const p of existing) {
+      placeMap.set(`${String(p.adcode)}_${p.type}`, p)
+    }
+
     for (const place of data.places) {
-      const match = existing.find(p => p.id === place.id || (p.adcode === place.adcode && p.type === place.type))
+      if (!place || !place.adcode) continue
+      const targetAdcode = String(place.adcode)
+      const key = `${targetAdcode}_${place.type}`
+      const match = placeMap.get(key)
+
       if (!match) {
-        await db.places.put(place)
+        const record: TravelPlace = {
+          ...place,
+          adcode: targetAdcode,
+          id: place.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15) + Date.now().toString(36)),
+          createdAt: place.createdAt || new Date().toISOString(),
+          updatedAt: place.updatedAt || new Date().toISOString()
+        }
+        const idCollision = await db.places.get(record.id)
+        if (idCollision && (String(idCollision.adcode) !== targetAdcode || idCollision.type !== record.type)) {
+          record.id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15) + Date.now().toString(36)
+        }
+        await db.places.put(record)
+        placeMap.set(key, record)
         placeCount++
       } else {
         const hasNewNote = Boolean(place.note && place.note !== match.note)
         const hasNewDate = Boolean(place.visitDate && place.visitDate !== match.visitDate)
-        const isNewer = Boolean(place.updatedAt && match.updatedAt && new Date(place.updatedAt) > new Date(match.updatedAt))
+        const isNewer = Boolean(place.updatedAt && (!match.updatedAt || new Date(place.updatedAt) > new Date(match.updatedAt)))
         if (hasNewNote || hasNewDate || isNewer) {
-          await db.places.put({ ...match, ...place, id: match.id })
+          const updatedRecord = { ...match, ...place, id: match.id }
+          await db.places.put(updatedRecord)
+          placeMap.set(key, updatedRecord)
           placeCount++
         }
       }

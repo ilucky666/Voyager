@@ -8,6 +8,13 @@
   status = 200
 
 [[headers]]
+  for = "/webdav-proxy/*"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate, max-age=0"
+    Pragma = "no-cache"
+    Expires = "0"
+
+[[headers]]
   for = "/geo/*"
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
