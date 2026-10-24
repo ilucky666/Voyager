@@ -8,23 +8,60 @@ export interface WebDAVConfig {
   path: string
 }
 
-export function getWebDAVClient(config: WebDAVConfig): WebDAVClient {
-  let finalUrl = config.url
-  // Use proxy for Jianguoyun to bypass CORS in both dev and prod
-  if (finalUrl.includes('dav.jianguoyun.com')) {
+export function normalizeWebDAVConfig(config: WebDAVConfig): { baseUrl: string; path: string; isJianguo: boolean } {
+  const isJianguo = (config.url || '').includes('jianguoyun')
+  let cleanUrl = (config.url || '').trim()
+  let cleanPath = (config.path || '').trim()
+
+  let subfolderFromUrl = ''
+  if (isJianguo && cleanUrl.includes('dav.jianguoyun.com')) {
     try {
-      const urlObj = new URL(finalUrl)
-      let pathname = urlObj.pathname
-      if (!pathname.endsWith('/')) {
-        pathname += '/'
+      const u = new URL(cleanUrl)
+      let p = decodeURIComponent(u.pathname)
+      p = p.replace(/^\/webdav-proxy/, '')
+      if (p.startsWith('/dav')) {
+        p = p.substring(4)
       }
-      finalUrl = '/webdav-proxy' + pathname
-    } catch {
-      finalUrl = finalUrl.replace('https://dav.jianguoyun.com', '/webdav-proxy')
+      p = p.replace(/\/+$/, '')
+      if (p && p !== '/') {
+        subfolderFromUrl = p.startsWith('/') ? p : '/' + p
+      }
+    } catch {}
+  }
+
+  // If user entered a subfolder in the URL (e.g. https://dav.jianguoyun.com/dav/我的坚果云/),
+  // extract it into the path
+  if (subfolderFromUrl) {
+    if (!cleanPath.startsWith(subfolderFromUrl)) {
+      cleanPath = subfolderFromUrl + (cleanPath.startsWith('/') ? cleanPath : '/' + cleanPath)
     }
   }
 
-  return createClient(finalUrl, {
+  if (!cleanPath) {
+    cleanPath = isJianguo ? '/我的坚果云/voyager-sync.json' : '/voyager-sync.json'
+  }
+  if (!cleanPath.startsWith('/')) {
+    cleanPath = '/' + cleanPath
+  }
+
+  // Deduplicate repeated /我的坚果云 to prevent 409 Conflict
+  cleanPath = cleanPath.replace(/\/+我的坚果云\/+我的坚果云\//g, '/我的坚果云/')
+  cleanPath = cleanPath.replace(/\/+/g, '/')
+
+  let baseUrl = cleanUrl
+  if (isJianguo && cleanUrl.includes('dav.jianguoyun.com')) {
+    baseUrl = '/webdav-proxy/dav/'
+  } else if (!baseUrl.endsWith('/')) {
+    baseUrl += '/'
+  }
+
+  return { baseUrl, path: cleanPath, isJianguo }
+}
+
+export function getWebDAVClient(config: WebDAVConfig): WebDAVClient {
+  const norm = normalizeWebDAVConfig(config)
+
+  return createClient(norm.baseUrl, {
     username: config.user,
     password: config.pass,
     headers: {
@@ -35,10 +72,11 @@ export function getWebDAVClient(config: WebDAVConfig): WebDAVClient {
 }
 
 export async function testWebDAVConnection(config: WebDAVConfig): Promise<boolean | string> {
+  const norm = normalizeWebDAVConfig(config)
   const client = getWebDAVClient(config)
-  const isJianguo = config.url.includes('jianguoyun')
+  const isJianguo = norm.isJianguo
   const defaultPath = isJianguo ? '/我的坚果云/voyager-sync.json' : '/voyager-sync.json'
-  const targetPath = (config.path || defaultPath).trim()
+  const targetPath = (norm.path || defaultPath).trim()
 
   // 1. Try OPTIONS on root (standard HTTP method supported by reverse proxies)
   try {
@@ -60,7 +98,7 @@ export async function testWebDAVConnection(config: WebDAVConfig): Promise<boolea
     if (status === 401) {
       return `认证失败 (401)：请检查用户名与应用密码`
     }
-    if (status === 404 || status === 403) {
+    if (status === 404 || status === 403 || status === 409) {
       // For Jianguoyun, test /我的坚果云 path if root was checked
       if (isJianguo && !targetPath.includes('我的坚果云')) {
         try {
@@ -68,10 +106,10 @@ export async function testWebDAVConnection(config: WebDAVConfig): Promise<boolea
           return true
         } catch (subErr: any) {
           const subStatus = subErr?.status || subErr?.response?.status
-          if (subStatus === 404) return true
+          if (subStatus === 404 || subStatus === 409) return true
         }
       }
-      if (status === 404) return true
+      if (status === 404 || status === 409) return true
     }
   }
 
@@ -90,45 +128,85 @@ export async function testWebDAVConnection(config: WebDAVConfig): Promise<boolea
 }
 
 export async function uploadToWebDAV(config: WebDAVConfig, data: string): Promise<string> {
+  const norm = normalizeWebDAVConfig(config)
   const client = getWebDAVClient(config)
-  const isJianguo = config.url.includes('jianguoyun')
+  const isJianguo = norm.isJianguo
 
-  let targetPath = (config.path || '').trim()
-  if (!targetPath) {
-    targetPath = isJianguo ? '/我的坚果云/voyager-sync.json' : '/voyager-sync.json'
-  }
-  if (!targetPath.startsWith('/')) {
-    targetPath = '/' + targetPath
-  }
-  // Jianguoyun does not allow creating files directly in /dav/ root; enforce /我的坚果云 prefix
-  if (isJianguo && !targetPath.includes('我的坚果云')) {
-    targetPath = '/我的坚果云' + targetPath
+  let primaryPath = norm.path
+  if (!primaryPath || primaryPath === '/') {
+    primaryPath = isJianguo ? '/我的坚果云/voyager-sync.json' : '/voyager-sync.json'
   }
 
-  try {
-    await client.putFileContents(targetPath, data, {
-      overwrite: true,
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
-      }
-    })
-    return targetPath
-  } catch (err: any) {
-    const status = err?.status || err?.response?.status
-    if (status === 403 && !targetPath.includes('我的坚果云') && isJianguo) {
-      const jiangguoPath = '/我的坚果云' + targetPath
-      await client.putFileContents(jiangguoPath, data, {
+  const uploadCandidates: string[] = [primaryPath]
+
+  if (isJianguo) {
+    if (!primaryPath.includes('我的坚果云')) {
+      uploadCandidates.push('/我的坚果云' + (primaryPath.startsWith('/') ? primaryPath : '/' + primaryPath))
+    } else {
+      uploadCandidates.push(primaryPath.replace('/我的坚果云', ''))
+    }
+    uploadCandidates.push('/我的坚果云/voyager-sync.json')
+    uploadCandidates.push('/voyager-sync.json')
+  } else {
+    uploadCandidates.push('/voyager-sync.json')
+  }
+
+  const uniqueCandidates = Array.from(new Set(uploadCandidates.map(p => p.replace(/\/+/g, '/'))))
+
+  let lastError: any = null
+
+  for (const candidatePath of uniqueCandidates) {
+    try {
+      await client.putFileContents(candidatePath, data, {
         overwrite: true,
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
         }
       })
-      return jiangguoPath
+      return candidatePath
+    } catch (err: any) {
+      lastError = err
+      const status = err?.status || err?.response?.status
+
+      // 409 Conflict: parent collection doesn't exist, or 403 Forbidden: root not allowed
+      if (status === 409 || status === 403) {
+        // Attempt to create parent directory if candidatePath has subdirectories
+        const lastSlash = candidatePath.lastIndexOf('/')
+        if (lastSlash > 0) {
+          const parentDir = candidatePath.substring(0, lastSlash)
+          try {
+            await client.createDirectory(parentDir)
+            // Retry upload to this path
+            await client.putFileContents(candidatePath, data, {
+              overwrite: true,
+              headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+              }
+            })
+            return candidatePath
+          } catch (createDirErr: any) {
+            console.warn(`[WebDAV] Could not auto-create directory ${parentDir}:`, createDirErr)
+          }
+        }
+      }
+      console.warn(`[WebDAV] Upload candidate ${candidatePath} failed (status ${status}):`, err)
     }
-    throw err
   }
+
+  const status = lastError?.status || lastError?.response?.status
+  if (status === 409) {
+    throw new Error(`WebDAV 路径冲突 (409)：坚果云上级文件夹可能不存在或路径格式冲突，已尝试自动建夹及备用路径`)
+  }
+  if (status === 403) {
+    throw new Error(`WebDAV 访问被拒绝 (403)：坚果云禁止直接保存在根目录，请确保云端存在 /我的坚果云/ 或指定文件夹`)
+  }
+  if (status === 401) {
+    throw new Error(`WebDAV 认证失败 (401)：请检查坚果云用户名与应用密码`)
+  }
+
+  throw lastError
 }
 
 export interface WebDAVDownloadResult {
@@ -137,21 +215,22 @@ export interface WebDAVDownloadResult {
 }
 
 export async function downloadFromWebDAV(config: WebDAVConfig): Promise<WebDAVDownloadResult | null> {
+  const norm = normalizeWebDAVConfig(config)
   const client = getWebDAVClient(config)
-  const isJianguo = config.url.includes('jianguoyun')
+  const isJianguo = norm.isJianguo
 
-  const userPath = (config.path || '').trim()
   const candidatePaths: string[] = []
-
-  if (userPath) {
-    const norm = userPath.startsWith('/') ? userPath : '/' + userPath
-    if (isJianguo && !norm.includes('我的坚果云')) {
-      candidatePaths.push('/我的坚果云' + norm)
+  if (norm.path && norm.path !== '/') {
+    candidatePaths.push(norm.path)
+    if (isJianguo) {
+      if (!norm.path.includes('我的坚果云')) {
+        candidatePaths.push('/我的坚果云' + (norm.path.startsWith('/') ? norm.path : '/' + norm.path))
+      } else {
+        candidatePaths.push(norm.path.replace('/我的坚果云', ''))
+      }
     }
-    candidatePaths.push(norm)
   }
 
-  // Prioritize Jianguoyun default folder if Jianguoyun
   if (isJianguo) {
     candidatePaths.push('/我的坚果云/voyager-sync.json')
     candidatePaths.push('/我的坚果云/voyager.json')
@@ -161,11 +240,9 @@ export async function downloadFromWebDAV(config: WebDAVConfig): Promise<WebDAVDo
     candidatePaths.push('/voyager-sync.json')
     candidatePaths.push('/voyager.json')
     candidatePaths.push('/我的坚果云/voyager-sync.json')
-    candidatePaths.push('/我的坚果云/voyager.json')
   }
 
-  // Deduplicate candidate paths
-  const uniquePaths = Array.from(new Set(candidatePaths))
+  const uniquePaths = Array.from(new Set(candidatePaths.map(p => p.replace(/\/+/g, '/'))))
 
   let lastAuthError: Error | null = null
   let lastNetworkError: Error | null = null
@@ -173,8 +250,6 @@ export async function downloadFromWebDAV(config: WebDAVConfig): Promise<WebDAVDo
 
   for (const path of uniquePaths) {
     try {
-      // Direct GET without PROPFIND to bypass Netlify proxy 405 limitations
-      // Pass cache-busting headers to prevent browser/CDN from serving stale cached JSON
       const content = await client.getFileContents(path, {
         format: 'text',
         headers: {
@@ -192,18 +267,18 @@ export async function downloadFromWebDAV(config: WebDAVConfig): Promise<WebDAVDo
     } catch (error: any) {
       const status = error?.status || error?.response?.status
       if (status === 401) {
-        // 401 means invalid credentials across all endpoints
         lastAuthError = new Error(`WebDAV 认证失败 (401)，请检查账号和应用密码`)
         break
       }
       if (status === 403) {
-        // 403 on Jianguoyun root folder is expected because /dav/ root cannot hold files.
-        // Continue to check /我的坚果云/ candidate paths!
         lastAuthError = new Error(`WebDAV 访问被拒绝 (403)，请检查坚果云权限及路径`)
         continue
       }
       if (status === 404) {
-        // Path does not exist, continue checking other candidate paths
+        continue
+      }
+      if (status === 409) {
+        // 409 on download typically means parent collection does not exist
         continue
       }
       all404 = false
@@ -212,12 +287,10 @@ export async function downloadFromWebDAV(config: WebDAVConfig): Promise<WebDAVDo
     }
   }
 
-  // Throw authentication error if credentials failed
   if (lastAuthError) {
     throw lastAuthError
   }
 
-  // If a non-404 network or server error occurred, throw so callers don't assume cloud is empty
   if (lastNetworkError && !all404) {
     throw new Error(`连接云端服务异常 (${lastNetworkError.message || lastNetworkError})，为保护数据已中止`)
   }

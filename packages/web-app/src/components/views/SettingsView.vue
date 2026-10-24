@@ -150,7 +150,15 @@ async function handleWebdavSyncToCloud() {
     }
     showMessage(`已安全双向同步至云端 (共 ${localPlacesCount} 个地点)`, 'success')
   } catch (e: any) {
-    showMessage('云端同步失败: ' + (e.message || String(e)), 'error')
+    let msg = e.message || String(e)
+    if (msg.includes('409')) {
+      msg = 'WebDAV 路径冲突 (409)：云端上级文件夹可能不存在或路径格式冲突，请检查路径设置'
+    } else if (msg.includes('403')) {
+      msg = 'WebDAV 访问被拒绝 (403)：坚果云文件须存放在根目录子文件夹（如 /我的坚果云/）中'
+    } else if (msg.includes('401')) {
+      msg = 'WebDAV 认证失败 (401)：请检查坚果云用户名与应用密码'
+    }
+    showMessage('云端同步失败: ' + msg, 'error')
   }
 }
 
@@ -168,7 +176,15 @@ async function handleWebdavSyncFromCloud() {
       showMessage('云端未找到备份文件，请检查 WebDAV 路径', 'error')
     }
   } catch (e: any) {
-    showMessage('从云端导入失败: ' + (e.message || String(e)), 'error')
+    let msg = e.message || String(e)
+    if (msg.includes('409')) {
+      msg = 'WebDAV 路径冲突 (409)：请检查同步路径设置'
+    } else if (msg.includes('403')) {
+      msg = 'WebDAV 访问被拒绝 (403)：请检查坚果云权限'
+    } else if (msg.includes('401')) {
+      msg = 'WebDAV 认证失败 (401)：请检查坚果云用户名与应用密码'
+    }
+    showMessage('从云端导入失败: ' + msg, 'error')
   }
 }
 
