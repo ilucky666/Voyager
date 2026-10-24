@@ -18,18 +18,13 @@ const qrCodeUrl = ref('')
 const showQrModal = ref(false)
 
 const savedWebdavUrl = localStorage.getItem('webdav_url') || ''
-const isJianguo = savedWebdavUrl.includes('jianguoyun')
-let savedWebdavPath = localStorage.getItem('webdav_path') || ''
-if (isJianguo && (!savedWebdavPath || savedWebdavPath === '/voyager-sync.json')) {
-  savedWebdavPath = '/我的坚果云/voyager-sync.json'
-  localStorage.setItem('webdav_path', savedWebdavPath)
-}
+const savedWebdavPath = localStorage.getItem('webdav_path') || ''
 
 const webdavConfig = ref<WebDAVConfig>({
   url: savedWebdavUrl,
   user: localStorage.getItem('webdav_user') || '',
   pass: localStorage.getItem('webdav_pass') || '',
-  path: savedWebdavPath || (isJianguo ? '/我的坚果云/voyager-sync.json' : '/voyager-sync.json')
+  path: savedWebdavPath || '/voyager-sync.json'
 })
 const webdavTesting = ref(false)
 const showWebdavSettings = ref(false)
@@ -86,9 +81,8 @@ async function handleGenSyncLink() {
 async function handleWebdavTest() {
   webdavTesting.value = true
   try {
-    const isJianguo = webdavConfig.value.url.includes('jianguoyun')
-    if (isJianguo && (!webdavConfig.value.path || webdavConfig.value.path === '/voyager-sync.json')) {
-      webdavConfig.value.path = '/我的坚果云/voyager-sync.json'
+    if (!webdavConfig.value.path) {
+      webdavConfig.value.path = '/voyager-sync.json'
     }
     const errorMsg = await testWebDAVConnection(webdavConfig.value)
     webdavTesting.value = false
@@ -372,20 +366,14 @@ function showMessage(msg: string, type: 'success' | 'error') {
           <template v-if="webdavConfig.url">
             <div class="flex justify-between items-center px-4 py-3.5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors border-b border-gray-200 dark:border-gray-700/50" @click="handleWebdavSyncToCloud">
               <div class="flex items-center gap-3">
-                <CloudUpload class="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                <div class="flex flex-col">
-                  <span class="text-[15px] font-medium">双向安全同步至云端</span>
-                  <span class="text-[11px] text-gray-500">自动拉取合并云端数据并备份，防历史覆盖</span>
-                </div>
+                <CloudUpload class="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                <span class="text-[15px] font-medium">上传数据至云端</span>
               </div>
             </div>
             <div class="flex justify-between items-center px-4 py-3.5 cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 transition-colors" @click="handleWebdavSyncFromCloud">
               <div class="flex items-center gap-3">
-                <CloudDownload class="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                <div class="flex flex-col">
-                  <span class="text-[15px] font-medium">从云端拉取数据</span>
-                  <span class="text-[11px] text-gray-500">仅从云端获取最新备份并合并到本地</span>
-                </div>
+                <CloudDownload class="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                <span class="text-[15px] font-medium">从云端拉取数据</span>
               </div>
             </div>
           </template>

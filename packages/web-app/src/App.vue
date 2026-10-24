@@ -33,19 +33,14 @@ onMounted(async () => {
   // Pull from WebDAV cloud if configured
   const webdavUrl = localStorage.getItem('webdav_url')
   if (webdavUrl) {
-    const isJianguo = webdavUrl.includes('jianguoyun')
-    let savedPath = localStorage.getItem('webdav_path') || ''
-    if (isJianguo && (!savedPath || savedPath === '/voyager-sync.json')) {
-      savedPath = '/我的坚果云/voyager-sync.json'
-      localStorage.setItem('webdav_path', savedPath)
-    }
+    const savedPath = localStorage.getItem('webdav_path') || '/voyager-sync.json'
 
     try {
       const res = await downloadFromWebDAV({
         url: webdavUrl,
         user: localStorage.getItem('webdav_user') || '',
         pass: localStorage.getItem('webdav_pass') || '',
-        path: savedPath || (isJianguo ? '/我的坚果云/voyager-sync.json' : '/voyager-sync.json')
+        path: savedPath
       })
       if (res && res.data) {
         if (res.foundPath && res.foundPath !== savedPath) {

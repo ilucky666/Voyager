@@ -1,5 +1,5 @@
 [build]
-  command = "rm -rf node_modules package-lock.json packages/web-app/node_modules packages/web-app/package-lock.json && npm install && npm --workspace=packages/web-app run build"
+  command = "rm -rf node_modules package-lock.json packages/web-app/node_modules packages/web-app/package-lock.json && npm install --legacy-peer-deps && npm --workspace=packages/web-app run build"
   publish = "packages/web-app/dist"
 
 [[redirects]]
@@ -11,12 +11,9 @@
   for = "/webdav-proxy/*"
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate, max-age=0"
-    Pragma = "no-cache"
-    Expires = "0"
 
 [[headers]]
   for = "/geo/*"
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
     Access-Control-Allow-Origin = "*"
-
